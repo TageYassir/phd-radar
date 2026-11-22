@@ -1,0 +1,18 @@
+# URLs are starting points, NOT verified. Use "Run health check" in the UI and fix any that show "broken".
+# parser: static (httpx+BeautifulSoup) | rss (feed) | js (not implemented yet, treated as static)
+keywords: [data engineering, big data, lakehouse, ETL, Spark, Hadoop, streaming, data platform, MLOps, data quality, knowledge graph, Snowflake, Azure, AWS, Airflow, ontologies, RAG]
+sources:
+- {id: innovfond, country: Denmark, program: Industrial PhD (Innovation Fund), url: "https://innovationsfonden.dk/en/programmes/industrial-phd", parser: static, enabled: true}
+- {id: rcn, country: Norway, program: Nærings-ph.d. (RCN), url: "https://www.forskningsradet.no/en/apply-for-funding/", parser: static, enabled: true}
+- {id: miciu, country: Spain, program: Doctorados Industriales (MICIU), url: "https://www.ciencia.gob.es/", parser: static, enabled: true}
+- {id: agaur, country: Spain, program: Doctorats Industrials (AGAUR), url: "https://agaur.gencat.cat/en/beques-i-ajuts/doctorats-industrials/", parser: static, enabled: true}
+- {id: vlaio, country: Belgium, program: Baekeland (VLAIO), url: "https://www.vlaio.be/en", parser: static, enabled: true}
+- {id: win4doc, country: Belgium, program: Win4Doc, url: "https://www.wallonie-recherche.be/", parser: static, enabled: true}
+- {id: ukri, country: United Kingdom, program: UKRI CASE, url: "https://www.ukri.org/what-we-do/developing-people-and-skills/", parser: static, enabled: true}
+- {id: daad, country: Germany, program: DAAD PhD database, url: "https://www.daad.de/en/study-and-research-in-germany/phd-studies-and-research/", parser: static, enabled: true}
+- {id: euraxess, country: EU, program: EURAXESS / MSCA DN, url: "https://euraxess.ec.europa.eu/jobs/search?keywords=data%20engineering%20phd", parser: static, enabled: true}
+- {id: anrt, country: France, program: CIFRE (ANRT), url: "https://www.anrt.asso.fr/fr/cifre-7843", parser: static, enabled: true}
+- {id: abg, country: France, program: ABG, url: "https://www.abg.asso.fr/fr/candidatOffres", parser: static, enabled: true}
+- {id: adum, country: France, program: ADUM, url: "https://adum.fr/", parser: static, enabled: true}
+- {id: findaphd, country: UK, program: FindAPhD, url: "https://www.findaphd.com/phds/?Keywords=data+engineering", parser: static, enabled: true}
+- {id: acadtransfer, country: Netherlands, program: Academic Transfer, url: "https://www.academictransfer.com/en/jobs/?q=data+engineering+phd", parser: static, enabled: true}

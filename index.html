@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhD-Radar</title>
+<style>
+:root{--bg:#f3f5f2;--sf:#fff;--ink:#14232b;--mut:#5d6d73;--ln:#d9e0dc;--side:#12303a;--sideink:#cfe3dd;--ac:#0f8b6d;--ac2:#c9831b;--bad:#b3392f;--ok:#0f8b6d;--warn:#c9831b}
+:root[data-theme=dark]{--bg:#0e1a1f;--sf:#15262d;--ink:#e3eeea;--mut:#8ea3a8;--ln:#26404a;--side:#0a1317;--sideink:#a9c4bd;--ac:#35c79f;--ac2:#e0a444;--bad:#e8786d;--ok:#35c79f;--warn:#e0a444}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 .5em}
+h1{font-size:1.6rem}h2{font-size:1.2rem}h3{font-size:1rem}
+nav{width:200px;background:var(--side);padding:18px 10px;position:sticky;top:0;height:100vh;flex:none}
+nav .logo{font:600 1.25rem Georgia,serif;color:#fff;padding:0 10px 16px}
+nav .logo i{color:var(--ac);font-style:normal}
+nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--sideink);padding:9px 12px;border-radius:6px;font:inherit;cursor:pointer}
+nav button.on{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 3px 0 var(--ac)}
+nav button:hover{background:rgba(255,255,255,.06)}
+main{flex:1;padding:22px 26px;min-width:0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+input,select,textarea,button.b{font:inherit;border:1px solid var(--ln);background:var(--sf);color:var(--ink);border-radius:6px;padding:6px 9px}
+textarea{width:100%;min-height:70px}
+button.b{cursor:pointer}button.b.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button.b:hover{filter:brightness(.95)}
+:focus-visible{outline:2px solid var(--ac2);outline-offset:1px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:14px 16px;margin-bottom:14px}
+.tw{overflow-x:auto;background:var(--sf);border:1px solid var(--ln);border-radius:8px}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--ln);vertical-align:middle}
+th{font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap;user-select:none}
+tr.row:hover{background:color-mix(in srgb,var(--ac) 7%,transparent);cursor:pointer}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid currentColor}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--mut)}
+.meter{width:90px;height:8px;background:var(--ln);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.meter b{display:block;height:100%;background:var(--ac)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.stat{font:600 1.8rem Georgia,serif}
+.kan{display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:10px;overflow-x:auto}
+.col{background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:8px;min-height:160px}
+.kc{border:1px solid var(--ln);border-radius:6px;padding:8px;margin-top:8px;background:var(--bg)}
+.chip{display:inline-block;background:var(--bg);border:1px solid var(--ln);border-radius:4px;padding:0 6px;margin:2px;font-size:12px}
+.chip.g{border-color:var(--ok);color:var(--ok)}.chip.r{border-color:var(--bad);color:var(--bad)}
+pre{background:var(--bg);padding:10px;border-radius:6px;max-height:220px;overflow:auto;white-space:pre-wrap;font-size:12px}
+#toast{position:fixed;bottom:16px;right:16px;background:var(--side);color:#fff;padding:9px 14px;border-radius:6px;display:none}
+label{display:block;margin:8px 0 3px;color:var(--mut)}
+@media(max-width:760px){body{flex-direction:column}nav{width:100%;height:auto;position:static;display:flex;overflow-x:auto;padding:6px}nav .logo{display:none}nav button{white-space:nowrap;width:auto}main{padding:14px}}
+@media print{nav,.bar,#toast{display:none}body{display:block}}
+</style>
+</head>
+<body>
+<nav id="nav"></nav>
+<main id="app"></main>
+<div id="toast" role="status"></div>
+<script>
+"use strict";
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const TABS=[["dash","Offers"],["detail","Report"],["profile","Profile & CVs"],["src","Sources"],["contacts","Contacts"],["apps","Applications"],["set","Settings"]];
+const STAGES=["Saved","Contacted","Applied","Interview","Result"];
+const today=new Date().toISOString().slice(0,10);
+const addDays=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
+
+/* ---------- state + persistence (works offline with demo data) ---------- */
+const DEMO={
+ offers:[
+  {id:"o1",title:"Industrial PhD: Lakehouse architectures for supply-chain data",institution:"DTU",industry_partner:"Maersk",country:"Denmark",city:"Copenhagen",program_type:"ErhvervsPhD",funding:"≈ 4,300 EUR/month",deadline:addDays(21),keywords:["lakehouse","Spark","supply chain"],chance:72,match:81,source:"Innovation Fund DK",url:"#",description_text:"Company-employed PhD, 3 years, split between Maersk and DTU. Requires MSc in computer science or data engineering, Spark and cloud experience.",requires:["Spark","Azure","SQL","MSc degree"]},
+  {id:"o2",title:"CIFRE: Data quality & governance for industrial IoT",institution:"Université de Lyon",industry_partner:"Schneider Electric",country:"France",city:"Lyon",program_type:"CIFRE",funding:"≈ 2,300 EUR/month gross",deadline:addDays(9),keywords:["data quality","governance","ETL"],chance:58,match:66,source:"ABG",url:"#",description_text:"CIFRE contract. French required. Candidate must be recruited by the company before ANRT submission.",requires:["French","Airflow","Python"]},
+  {id:"o3",title:"MSCA DN: Knowledge graphs for industrial data platforms",institution:"KU Leuven",industry_partner:"Siemens",country:"Belgium",city:"Leuven",program_type:"MSCA",funding:"≈ 3,400 EUR/month + mobility",deadline:addDays(38),keywords:["knowledge graph","ontologies","data platform"],chance:64,match:70,source:"EURAXESS",url:"#",description_text:"Doctoral network with industrial secondments. Mobility rule: no residence in Belgium for more than 12 months in the last 3 years — fits non-EU applicants.",requires:["Neo4j","Python","English"]},
+  {id:"o4",title:"CASE Studentship: Streaming analytics at scale",institution:"University of Edinburgh",industry_partner:"Rolls-Royce",country:"United Kingdom",city:"Edinburgh",program_type:"CASE",funding:"≈ 2,300 GBP/month",deadline:addDays(-4),keywords:["streaming","Spark"],chance:40,match:55,source:"FindAPhD",url:"#",description_text:"Home-fee status often required; international places limited.",requires:["Kafka","Spark"]},
+  {id:"o5",title:"Doctorado Industrial: MLOps y calidad de datos",institution:"UPC",industry_partner:"Seat",country:"Spain",city:"Barcelona",program_type:"Doctorat Industrial",funding:"≈ 1,900 EUR/month",deadline:addDays(60),keywords:["MLOps","data quality"],chance:49,match:60,source:"AGAUR",url:"#",description_text:"Three-year company–university contract. Spanish or Catalan helpful.",requires:["Docker","Python","Spanish"]},
+  {id:"o6",title:"Nærings-ph.d.: Data platform for energy grids",institution:"NTNU",industry_partner:"Equinor",country:"Norway",city:"Trondheim",program_type:"Nærings-ph.d.",funding:"≈ 5,000 EUR/month",deadline:addDays(5),keywords:["data platform","streaming"],chance:61,match:68,source:"Research Council NO",url:"#",description_text:"Company employs the candidate for 3–4 years. Work permit handled by employer.",requires:["Azure","Spark","English"]}],
+ profile:{name:"Yassir Tagemouati",headline:"Big Data engineering student, EIDIA, UEMF, Fès (2022–2027)",skills:["AWS S3","Azure Synapse","ADF","ADLS Gen2","Key Vault","Snowflake","Spark","Hadoop/HDFS","MapReduce","Airflow","PostgreSQL","SQL","Power BI","Python","Docker","Git","Medallion architecture"],links:{github:"",linkedin:"",portfolio:""},languages:"French (advanced), English (advanced), Arabic (native)",prefs:"Funded or industrial PhD in data engineering, big data, cloud data architecture. Non-EU candidate based in Morocco.",cvs:[]},
+ sources:[
+  ["innovfond","Denmark","Industrial PhD (Innovation Fund)","static"],["rcn","Norway","Nærings-ph.d. (RCN)","static"],["miciu","Spain","Doctorados Industriales (MICIU)","static"],["agaur","Spain","Doctorats Industrials (AGAUR)","static"],["vlaio","Belgium","Baekeland (VLAIO)","static"],["win4doc","Belgium","Win4Doc","static"],["ukri","United Kingdom","UKRI CASE","js"],["daad","Germany","DAAD PhD database","js"],["euraxess","EU","EURAXESS / MSCA DN","rss"],["anrt","France","CIFRE (ANRT)","js"],["abg","France","ABG","static"],["adum","France","ADUM","static"],["findaphd","UK","FindAPhD","js"],["acadtransfer","Netherlands","Academic Transfer","rss"]].map(s=>({id:s[0],country:s[1],program:s[2],parser:s[3],enabled:true,health:"unchecked"})),
+ contacts:[{name:"Dr. Example Supervisor",email:"supervisor [at] dtu.dk",role:"Associate Professor",org:"DTU",offer_id:"o1",confidence:.7,date_found:today}],
+ apps:{o1:"Saved"},
+ settings:{ollama:"http://localhost:11434",model:"qwen2.5:14b",embed:"nomic-embed-text",threshold:50,schedule:"0 7 * * *",lang:"EN",theme:"light",paid:false,privacy:true}
+};
+let S=JSON.parse(localStorage.getItem("phdradar")||"null")||structuredClone(DEMO);
+S.logs=S.logs||[];S.reports=S.reports||{};S.f={q:"",country:"",type:"",min:0,hideExp:true,sort:"chance",dir:-1};S.sel=new Set();S.cur=null;S.tab="dash";
+const save=()=>{const{f,sel,cur,tab,...rest}=S;localStorage.setItem("phdradar",JSON.stringify(rest))};
+const log=m=>{S.logs.unshift(new Date().toLocaleTimeString()+"  "+m);S.logs=S.logs.slice(0,200)};
+function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display="none",2600)}
+async function api(path,opt){try{const r=await fetch("/api"+path,opt);if(!r.ok)throw 0;return await r.json()}catch(e){return null}}
+const days=d=>d?Math.ceil((new Date(d)-new Date(today))/864e5):null;
+function dl(o){const n=days(o.deadline);if(n===null)return'<span class="pill mut">unknown</span>';if(n<0)return'<span class="pill bad">expired</span>';if(n<=14)return`<span class="pill warn">${n} d left</span>`;return`<span class="pill ok">${o.deadline}</span>`}
+const meter=v=>`<span class="meter"><b style="width:${v}%"></b></span> ${v}%`;
+function dlFile(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type||"text/plain"}));a.download=name;a.click()}
+
+/* ---------- shell ---------- */
+function setTheme(){document.documentElement.dataset.theme=S.settings.theme}
+function nav(){$("#nav").innerHTML='<div class="logo">PhD<i>·</i>Radar</div>'+TABS.map((t,i)=>`<button data-t="${t[0]}" class="${S.tab==t[0]?"on":""}" title="Key ${i+1}">${t[1]}</button>`).join("")}
+$("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)go(t)};
+function go(t){S.tab=t;nav();render()}
+document.addEventListener("keydown",e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){if(e.key=="Escape")e.target.blur();return}
+ const n=+e.key;if(n>=1&&n<=7)go(TABS[n-1][0]);if(e.key=="/"){e.preventDefault();const q=$("#q");if(q)q.focus()}});
+function render(){setTheme();({dash,detail,profile,src,contacts,apps,set}[S.tab])();save()}
+
+/* ---------- A) offers ---------- */
+function filtered(){const f=S.f,q=f.q.toLowerCase();let re=null;if(q.startsWith("/")&&q.length>2){try{re=new RegExp(q.slice(1),"i")}catch(e){}}
+ const hit=o=>{const h=(o.title+" "+o.institution+" "+o.industry_partner+" "+o.keywords.join(" ")+" "+o.description_text).toLowerCase();
+  if(!q)return true;if(re)return re.test(h);
+  const ors=q.split(/\s+or\s+/);return ors.some(p=>p.split(/\s+and\s+|\s+/).filter(Boolean).every(w=>w[0]=="-"?!h.includes(w.slice(1)):h.includes(w)))};
+ return S.offers.filter(o=>hit(o)&&(!f.country||o.country==f.country)&&(!f.type||o.program_type==f.type)&&o.chance>=f.min&&(!f.hideExp||days(o.deadline)===null||days(o.deadline)>=0))
+ .sort((a,b)=>{let x=a[f.sort],y=b[f.sort];if(f.sort=="deadline"){x=x||"9";y=y||"9"}return(x>y?1:x<y?-1:0)*f.dir})}
+function dash(){const L=filtered(),opt=k=>[...new Set(S.offers.map(o=>o[k]))].map(v=>`<option ${S.f[k=="program_type"?"type":k]==v?"selected":""}>${esc(v)}</option>`).join("");
+ const soon=S.offers.filter(o=>{const n=days(o.deadline);return n!==null&&n>=0&&n<=14}).length,hi=S.offers.filter(o=>o.chance>=S.settings.threshold).length;
+ const th=(k,l)=>`<th data-s="${k}">${l}${S.f.sort==k?(S.f.dir<0?" ▾":" ▴"):""}</th>`;
+ $("#app").innerHTML=`<h1>Offers</h1>
+ ${runCard()}
+ <div class="grid" style="margin-bottom:14px"><div class="card"><div class="stat">${S.offers.length}</div>offers collected</div><div class="card"><div class="stat">${hi}</div>above your ${S.settings.threshold}% threshold</div><div class="card"><div class="stat ${soon?"warn":""}">${soon}</div>deadlines within 14 days</div></div>
+ <div class="bar"><input id="q" placeholder="Search: spark and azure, -java, or /regex  (press /)" value="${esc(S.f.q)}" style="min-width:260px">
+ <select id="fc"><option value="">All countries</option>${opt("country")}</select><select id="ft"><option value="">All programs</option>${opt("program_type")}</select>
+ <label style="margin:0">Min chance <input id="fm" type="number" min="0" max="100" value="${S.f.min}" style="width:64px"></label>
+ <label style="margin:0"><input id="fe" type="checkbox" ${S.f.hideExp?"checked":""}> hide expired</label>
+ <button class="b" id="score">Score all</button><button class="b" id="ics">Deadlines .ics</button><button class="b" id="bulk">Save selected (${S.sel.size})</button></div>
+ <div class="tw"><table><thead><tr><th></th>${th("title","Offer")}${th("country","Country")}${th("program_type","Program")}${th("funding","Funding")}${th("deadline","Deadline")}${th("chance","Chance")}</tr></thead><tbody>
+ ${L.map(o=>`<tr class="row" data-id="${o.id}"><td><input type="checkbox" class="sel" ${S.sel.has(o.id)?"checked":""}></td><td><b>${esc(o.title)}</b><br><span class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}</span></td><td>${esc(o.country)}</td><td>${esc(o.program_type)}</td><td>${esc(o.funding)}</td><td>${dl(o)}</td><td>${meter(o.chance)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No offers match. Loosen the filters or run a crawl.</td></tr>'}</tbody></table></div>`;
+ const rr=()=>{S.f.q=$("#q").value;render();const q=$("#q");q.focus();q.setSelectionRange(99,99)};
+ $("#q").oninput=rr;$("#fc").onchange=e=>{S.f.country=e.target.value;render()};$("#ft").onchange=e=>{S.f.type=e.target.value;render()};
+ $("#fm").onchange=e=>{S.f.min=+e.target.value||0;render()};$("#fe").onchange=e=>{S.f.hideExp=e.target.checked;render()};
+ document.querySelectorAll("th[data-s]").forEach(h=>h.onclick=()=>{const k=h.dataset.s;S.f.dir=S.f.sort==k?-S.f.dir:-1;S.f.sort=k;render()});
+ document.querySelectorAll("tr.row").forEach(r=>r.onclick=e=>{if(e.target.classList.contains("sel")){e.target.checked?S.sel.add(r.dataset.id):S.sel.delete(r.dataset.id);$("#bulk").textContent=`Save selected (${S.sel.size})`;return}S.cur=r.dataset.id;go("detail")});
+ $("#score").onclick=scoreAll;$("#ics").onclick=ics;
+ $("#bulk").onclick=()=>{S.sel.forEach(id=>S.apps[id]=S.apps[id]||"Saved");toast(S.sel.size+" saved to tracker");S.sel.clear();render()}}
+function runCard(){const r=S.run,en=S.sources.filter(s=>s.enabled).length,on=r&&r.running;
+ return `<div class="card" id="run"><div class="bar" style="margin:0"><button class="b p" style="font-size:15px;padding:9px 18px" onclick="crawl()" ${on?"disabled":""}>${on?"Researching…":"Start research"}</button>${on?'<button class="b" onclick="stopRun()">Stop</button>':""}<span class="mut">Visits the ${en} enabled sources and collects new offers.</span></div>${r?runBody(r):""}</div>`}
+function runBody(r){const pc=r.total?Math.round(r.done/r.total*100):0,nm=id=>(S.sources.find(s=>s.id==id)||{program:id}).program;
+ const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut"};
+ return (r.msg?`<p class="bad" style="margin:10px 0 0">${esc(r.msg)}</p>`:"")+(r.total?`<p style="margin:10px 0 4px">${meter(pc)} ${r.done}/${r.total} sources, <b>${r.new||0}</b> new offers${r.running?"":" (finished)"}</p>`:"")+
+ (r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found:""}</span></span>`).join("")}
+function refreshRun(){const e=$("#run");if(e)e.outerHTML=runCard()}
+async function crawl(){const total=S.sources.filter(s=>s.enabled).length;
+ S.run={running:true,done:0,total,new:0,sources:[],msg:""};log("Research started on "+total+" sources");refreshRun();
+ const r=await api("/crawl/start",{method:"POST"});
+ if(!r){S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. A browser page cannot visit these sites itself. Start the backend with: python run.py"};log("Research failed: backend offline");refreshRun();return}
+ poll()}
+async function poll(){const s=await api("/crawl/status");
+ if(!s){S.run={...S.run,running:false,msg:"Lost connection to the backend."};refreshRun();return}
+ S.run={msg:"",...s};refreshRun();
+ if(s.running){setTimeout(poll,1500);return}
+ const o=await api("/offers");if(o)S.offers=o;log("Research finished: "+(s.new||0)+" new offers");toast((s.new||0)+" new offers found");if(S.tab=="dash")render()}
+async function stopRun(){await api("/crawl/stop",{method:"POST"});log("Research stop requested")}
+async function scoreAll(){toast("Scoring…");const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
+ if(r){const o=await api("/offers");if(o)S.offers=o;render()}else toast("Scoring needs the backend and Ollama. Demo scores shown.")}
+function ics(){const ev=S.offers.filter(o=>o.deadline).map(o=>`BEGIN:VEVENT\nUID:${o.id}@phdradar\nDTSTART;VALUE=DATE:${o.deadline.replace(/-/g,"")}\nSUMMARY:Deadline: ${o.title.replace(/[,;]/g," ")}\nEND:VEVENT`).join("\n");
+ dlFile("phd-deadlines.ics","BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PhD-Radar//EN\n"+ev+"\nEND:VCALENDAR","text/calendar")}
+
+/* ---------- B) detail / report ---------- */
+function detail(){const o=S.offers.find(x=>x.id==S.cur);if(!o){$("#app").innerHTML='<h1>Report</h1><p class="mut">Pick an offer in the Offers tab to see its full analysis.</p>';return}
+ const sk=new Set(S.profile.skills.map(s=>s.toLowerCase())),have=o.requires.filter(r=>[...sk].some(s=>s.includes(r.toLowerCase())||r.toLowerCase().includes(s))),miss=o.requires.filter(r=>!have.includes(r));
+ const rep=S.reports[o.id],n=days(o.deadline);
+ $("#app").innerHTML=`<div class="bar"><button class="b" id="back">Back to offers</button><button class="b p" id="deep">Run deep analysis</button><button class="b" id="md">Export Markdown</button><button class="b" onclick="print()">Print / PDF</button><select id="st">${["—",...STAGES].map(s=>`<option ${S.apps[o.id]==s?"selected":""}>${s}</option>`).join("")}</select></div>
+ <h1>${esc(o.title)}</h1><p class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}, ${esc(o.country)} · ${esc(o.program_type)} · source: ${esc(o.source)}</p>
+ <div class="grid"><div class="card"><h3>Chance of success</h3><div class="stat">${o.chance}%</div>${meter(o.chance)}<p class="mut">Hybrid score: skill overlap + embedding similarity + LLM judgement. Profile match ${o.match}%.</p></div>
+ <div class="card"><h3>Deadline</h3>${dl(o)}<p>${n===null?"No date found. Check the source page.":n<0?"This offer has closed.":n+" days remaining."}</p><h3>Funding</h3><p>${esc(o.funding)}</p></div>
+ <div class="card"><h3>Verdict</h3><span class="pill ${o.chance>=60&&(n===null||n>=0)?"ok":o.chance>=45?"warn":"bad"}">${o.chance>=60&&(n===null||n>=0)?"Go":o.chance>=45?"Maybe":"No-go"}</span><p class="mut">Rule-based until a deep analysis is run.</p></div></div>
+ <div class="card"><h3>Skills</h3>${have.map(s=>`<span class="chip g">${esc(s)}</span>`).join("")||'<span class="mut">No overlap found</span>'}<br>${miss.map(s=>`<span class="chip r">${esc(s)}</span>`).join("")}</div>
+ <div class="card"><h3>Offer text</h3><p>${esc(o.description_text)}</p></div>
+ <div class="card"><h3>Deep report</h3>${rep?`<pre id="rp">${esc(rep)}</pre>`:'<p class="mut">Not generated yet. Deep analysis fetches the full page and any call PDF, then asks Ollama with your whole profile. Every claim must cite a quote from the page.</p>'}</div>
+ <div class="card"><h3>Contacts for this offer</h3>${S.contacts.filter(c=>c.offer_id==o.id).map(c=>`<div>${esc(c.name)} · ${esc(c.email)} <span class="mut">${esc(c.role)}</span></div>`).join("")||'<span class="mut">None extracted yet.</span>'}</div>
+ <div class="card"><h3>Email draft</h3><textarea id="em" rows="8">${esc(draft(o))}</textarea><div class="bar" style="margin-top:8px"><button class="b" id="eml">Export .eml</button><button class="b p" id="send">Send (asks to confirm)</button></div></div>`;
+ $("#back").onclick=()=>go("dash");$("#st").onchange=e=>{e.target.value=="—"?delete S.apps[o.id]:S.apps[o.id]=e.target.value;save()};
+ $("#deep").onclick=async()=>{toast("Analyzing…");const r=await api("/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
+  S.reports[o.id]=r&&r.markdown?r.markdown:`# ${o.title}\n\n(Demo report: connect the backend and Ollama for a full analysis.)\n\n## Fit\nMatched: ${have.join(", ")||"none"}\nGaps: ${miss.join(", ")||"none"}\n\n## Next actions\n- Tailor CV to the matched skills\n- Contact the supervisor before the deadline`;render()};
+ $("#md").onclick=()=>dlFile(o.id+"-report.md",S.reports[o.id]||"# "+o.title+"\n\nNo deep report yet.");
+ $("#eml").onclick=()=>dlFile(o.id+".eml","Subject: Application: "+o.title+"\nContent-Type: text/plain; charset=utf-8\n\n"+$("#em").value);
+ $("#send").onclick=async()=>{if(!confirm("Send this email now?"))return;const r=await api("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({offer_id:o.id,body:$("#em").value})});toast(r?"Sent":"SMTP not configured or backend offline. Use Export .eml.")}}
+function draft(o){const p=S.profile,l=p.links;return `Dear Professor / Hiring team,\n\nI am ${p.name}, a ${p.headline}. I am writing about "${o.title}" (${o.program_type}, ${o.industry_partner}).\n\nMy background in ${p.skills.slice(0,6).join(", ")} matches your requirements, and I recently completed a Smartovate internship on Azure Synapse supply-chain pipelines.\n\nCV attached. ${[l.github&&"GitHub: "+l.github,l.linkedin&&"LinkedIn: "+l.linkedin,l.portfolio&&"Portfolio: "+l.portfolio].filter(Boolean).join(" | ")}\n\nBest regards,\n${p.name}`}
+
+/* ---------- C) profile ---------- */
+function profile(){const p=S.profile;
+ $("#app").innerHTML=`<h1>Profile & CVs</h1><div class="card"><label>Name</label><input id="pn" value="${esc(p.name)}" style="width:100%"><label>Headline</label><input id="ph" value="${esc(p.headline)}" style="width:100%">
+ <label>Skills (comma separated)</label><textarea id="ps">${esc(p.skills.join(", "))}</textarea><label>Languages</label><input id="pl" value="${esc(p.languages)}" style="width:100%">
+ <label>Preferences and eligibility notes</label><textarea id="pp">${esc(p.prefs)}</textarea>
+ <label>GitHub</label><input id="lg" value="${esc(p.links.github)}" style="width:100%"><label>LinkedIn</label><input id="ll" value="${esc(p.links.linkedin)}" style="width:100%"><label>Portfolio</label><input id="lp" value="${esc(p.links.portfolio)}" style="width:100%">
+ <div class="bar" style="margin-top:10px"><button class="b p" id="sp">Save profile</button></div></div>
+ <div class="card"><h3>CV versions</h3><input type="file" id="cv" accept=".pdf,.docx,.txt,.md" multiple>
+ ${p.cvs.map((c,i)=>`<div class="bar" style="margin-top:8px"><b>${esc(c.name)}</b><span class="mut">${c.size} KB</span><button class="b" data-d="${i}">Remove</button></div>`).join("")||'<p class="mut">Upload one CV per focus (data engineering, cloud, research) so the best one is picked per offer.</p>'}</div>`;
+ $("#sp").onclick=async()=>{Object.assign(p,{name:$("#pn").value,headline:$("#ph").value,skills:$("#ps").value.split(",").map(s=>s.trim()).filter(Boolean),languages:$("#pl").value,prefs:$("#pp").value,links:{github:$("#lg").value,linkedin:$("#ll").value,portfolio:$("#lp").value}});save();await api("/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});toast("Profile saved. Re-score to apply it.")};
+ $("#cv").onchange=async e=>{for(const f of e.target.files){const fd=new FormData();fd.append("file",f);await api("/cvs",{method:"POST",body:fd});p.cvs.push({name:f.name,size:Math.round(f.size/1024)})}render()};
+ document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{p.cvs.splice(+b.dataset.d,1);render()})}
+
+/* ---------- D) sources ---------- */
+async function src(){const r=await api("/sources");if(r&&Array.isArray(r))S.sources=r;
+ $("#app").innerHTML=`<h1>Sources & crawler</h1>${runCard()}<div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="dry">Dry run</button></div>
+ <div class="card"><input id="nu" placeholder="Add any URL or company career page" style="width:70%"> <button class="b" id="au">Add</button></div>
+ <div class="tw"><table><thead><tr><th>On</th><th>Country</th><th>Program</th><th>Parser</th><th>Health</th></tr></thead><tbody>${S.sources.map((s,i)=>`<tr><td><input type="checkbox" data-i="${i}" ${s.enabled?"checked":""}></td><td>${esc(s.country)}</td><td>${esc(s.program)}</td><td>${esc(s.parser)}</td><td class="${s.health=="ok"?"ok":s.health=="broken"?"bad":"mut"}">${esc(s.health)}</td></tr>`).join("")}</tbody></table></div>
+ <h3 style="margin-top:16px">Crawl log</h3><pre>${esc(S.logs.join("\n")||"No activity yet.")}</pre>`;
+ document.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{S.sources[+c.dataset.i].enabled=c.checked;save();api("/sources/"+S.sources[+c.dataset.i].id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:c.checked})})});
+ $("#hc").onclick=async()=>{const h=await api("/sources/health",{method:"POST"});if(h)S.sources=h;else{S.sources.forEach(s=>s.health="unchecked");log("Health check needs the backend")}render()};
+ $("#dry").onclick=async()=>{const r=await api("/crawl/start?dry=1",{method:"POST"});log(r?"Dry run: "+(r.new||0)+" would be added":"Dry run needs the backend");render()};
+ $("#au").onclick=async()=>{const u=$("#nu").value.trim();if(!u)return;const r=await api("/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});S.sources.push({id:"custom"+S.sources.length,country:"Custom",program:u,parser:"auto",enabled:true,health:r?"ok":"unchecked"});render()}}
+
+/* ---------- E) contacts ---------- */
+function contacts(){
+ $("#app").innerHTML=`<h1>Contacts</h1><div class="bar"><button class="b p" id="csv">Download contacts.csv</button></div><div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Organization</th><th>Offer</th><th>Confidence</th><th>Found</th></tr></thead><tbody>
+ ${S.contacts.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td>${esc(c.role)}</td><td>${esc(c.org)}</td><td>${esc(c.offer_id)}</td><td>${Math.round(c.confidence*100)}%</td><td>${esc(c.date_found)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No contacts yet. They appear after deep analysis.</td></tr>'}</tbody></table></div>`;
+ $("#csv").onclick=()=>{const k=["name","email","role","org","offer_id","confidence","date_found"];dlFile("contacts.csv",[k.join(","),...S.contacts.map(c=>k.map(x=>'"'+String(c[x]).replace(/"/g,'""')+'"').join(","))].join("\n"),"text/csv")}}
+
+/* ---------- F) applications ---------- */
+function apps(){
+ $("#app").innerHTML=`<h1>Applications</h1><div class="kan">${STAGES.map((st,si)=>`<div class="col"><h3>${st}</h3>${Object.keys(S.apps).filter(id=>S.apps[id]==st).map(id=>{const o=S.offers.find(x=>x.id==id);return o?`<div class="kc"><b>${esc(o.title)}</b><br><span class="mut">${esc(o.industry_partner)} · ${dl(o)}</span><div class="bar" style="margin:6px 0 0">${si?`<button class="b" data-m="${id}" data-to="${si-1}">←</button>`:""}${si<4?`<button class="b" data-m="${id}" data-to="${si+1}">→</button>`:""}<button class="b" data-x="${id}">Remove</button></div></div>`:""}).join("")}</div>`).join("")}</div>`;
+ document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{S.apps[b.dataset.m]=STAGES[+b.dataset.to];render()});
+ document.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{delete S.apps[b.dataset.x];render()})}
+
+/* ---------- G) settings ---------- */
+function set(){const s=S.settings;const f=(id,l,t="text")=>`<label>${l}</label><input id="${id}" type="${t}" value="${esc(s[id])}" style="width:100%">`;
+ $("#app").innerHTML=`<h1>Settings</h1><div class="card">${f("ollama","Ollama URL")}${f("model","Chat model (e.g. qwen2.5:14b, llama3.1:8b)")}${f("embed","Embedding model")}${f("threshold","Alert threshold, chance %","number")}${f("schedule","Crawl schedule (cron)")}
+ <label>Language</label><select id="lang"><option ${s.lang=="EN"?"selected":""}>EN</option><option ${s.lang=="FR"?"selected":""}>FR</option></select>
+ <label>Theme</label><select id="theme"><option value="light" ${s.theme=="light"?"selected":""}>Light</option><option value="dark" ${s.theme=="dark"?"selected":""}>Dark</option></select>
+ <label><input type="checkbox" id="paid" ${s.paid?"checked":""}> Allow paid API fallback (off by default)</label><label><input type="checkbox" id="privacy" ${s.privacy?"checked":""}> Privacy mode: log every outbound request</label>
+ <div class="bar" style="margin-top:10px"><button class="b p" id="ss">Save settings</button><button class="b" id="bk">Backup JSON</button><label class="b" style="margin:0;cursor:pointer">Restore<input type="file" id="rs" accept=".json" hidden></label></div></div>
+ <div class="card"><h3>Shortcuts</h3><p class="mut">1–7 switch tabs. / focuses search. Esc leaves a field.</p></div>`;
+ $("#ss").onclick=async()=>{["ollama","model","embed","schedule"].forEach(k=>s[k]=$("#"+k).value);s.threshold=+$("#threshold").value;s.lang=$("#lang").value;s.theme=$("#theme").value;s.paid=$("#paid").checked;s.privacy=$("#privacy").checked;save();await api("/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(s)});setTheme();toast("Settings saved")};
+ $("#bk").onclick=()=>{save();dlFile("phd-radar-backup.json",localStorage.getItem("phdradar"),"application/json")};
+ $("#rs").onchange=async e=>{try{localStorage.setItem("phdradar",await e.target.files[0].text());location.reload()}catch(x){toast("Not a valid backup")}}}
+
+/* ---------- boot ---------- */
+(async()=>{const st=await api("/crawl/status");if(st&&st.running){S.run=st;poll()}const o=await api("/offers");if(o&&o.length)S.offers=o;const p=await api("/profile");if(p&&p.skills)S.profile=p;nav();render()})();
+</script>
+</body>
+</html>
