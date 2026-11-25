@@ -11,7 +11,7 @@
 body{margin:0;font:14px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
 h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 .5em}
 h1{font-size:1.6rem}h2{font-size:1.2rem}h3{font-size:1rem}
-nav{width:200px;background:var(--side);padding:18px 10px;position:sticky;top:0;height:100vh;flex:none}
+nav{width:200px;background:var(--side);padding:18px 10px;position:sticky;top:0;height:100vh;flex:none;display:flex;flex-direction:column}
 nav .logo{font:600 1.25rem Georgia,serif;color:#fff;padding:0 10px 16px}
 nav .logo i{color:var(--ac);font-style:normal}
 nav button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--sideink);padding:9px 12px;border-radius:6px;font:inherit;cursor:pointer}
@@ -22,8 +22,8 @@ main{flex:1;padding:22px 26px;min-width:0}
 input,select,textarea,button.b{font:inherit;border:1px solid var(--ln);background:var(--sf);color:var(--ink);border-radius:6px;padding:6px 9px}
 textarea{width:100%;min-height:70px}
 button.b{cursor:pointer}button.b.p{background:var(--ac);border-color:var(--ac);color:#fff}
+button.b.warn{border-color:var(--warn);color:var(--warn)}
 button.b:hover{filter:brightness(.95)}
-:focus-visible{outline:2px solid var(--ac2);outline-offset:1px}
 .card{background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:14px 16px;margin-bottom:14px}
 .tw{overflow-x:auto;background:var(--sf);border:1px solid var(--ln);border-radius:8px}
 table{border-collapse:collapse;width:100%}
@@ -32,20 +32,15 @@ th{font-weight:600;color:var(--mut);cursor:pointer;white-space:nowrap;user-selec
 tr.row:hover{background:color-mix(in srgb,var(--ac) 7%,transparent);cursor:pointer}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid currentColor}
 .ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}.mut{color:var(--mut)}
-.meter{width:90px;height:8px;background:var(--ln);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+.meter{width:76px;height:8px;background:var(--ln);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
 .meter b{display:block;height:100%;background:var(--ac)}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .stat{font:600 1.8rem Georgia,serif}
-.kan{display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:10px;overflow-x:auto}
-.col{background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:8px;min-height:160px}
-.kc{border:1px solid var(--ln);border-radius:6px;padding:8px;margin-top:8px;background:var(--bg)}
 .chip{display:inline-block;background:var(--bg);border:1px solid var(--ln);border-radius:4px;padding:0 6px;margin:2px;font-size:12px}
 .chip.g{border-color:var(--ok);color:var(--ok)}.chip.r{border-color:var(--bad);color:var(--bad)}
-pre{background:var(--bg);padding:10px;border-radius:6px;max-height:220px;overflow:auto;white-space:pre-wrap;font-size:12px}
-#toast{position:fixed;bottom:16px;right:16px;background:var(--side);color:#fff;padding:9px 14px;border-radius:6px;display:none}
+pre{background:var(--bg);padding:10px;border-radius:6px;max-height:240px;overflow:auto;white-space:pre-wrap;font-size:12px}
+#toast{position:fixed;bottom:16px;right:16px;background:var(--side);color:#fff;padding:9px 14px;border-radius:6px;display:none;z-index:99}
 label{display:block;margin:8px 0 3px;color:var(--mut)}
-@media(max-width:760px){body{flex-direction:column}nav{width:100%;height:auto;position:static;display:flex;overflow-x:auto;padding:6px}nav .logo{display:none}nav button{white-space:nowrap;width:auto}main{padding:14px}}
-@media print{nav,.bar,#toast{display:none}body{display:block}}
 </style>
 </head>
 <body>
@@ -56,251 +51,306 @@ label{display:block;margin:8px 0 3px;color:var(--mut)}
 "use strict";
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const TABS=[["dash","Offers"],["detail","Report"],["profile","Profile & CVs"],["src","Sources"],["contacts","Contacts"],["apps","Applications"],["set","Settings"]];
-const STAGES=["Saved","Contacted","Applied","Interview","Result"];
+const TABS=[["dash","Offers"],["detail","Report"],["profile","Profile & CVs"],["src","Sources"],["contacts","Contacts"],["set","Settings"]];
 const today=new Date().toISOString().slice(0,10);
-const addDays=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
 
-const DEMO={
- offers:[
-  {id:"o1",title:"Industrial PhD: Lakehouse architectures for supply-chain data",institution:"DTU",industry_partner:"Maersk",country:"Denmark",city:"Copenhagen",program_type:"ErhvervsPhD",funding:"≈ 4,300 EUR/month",deadline:addDays(21),keywords:["lakehouse","Spark","supply chain"],chance:72,match:81,source:"Innovation Fund DK",url:"#",description_text:"Company-employed PhD, 3 years, split between Maersk and DTU. Requires MSc in computer science or data engineering, Spark and cloud experience.",requires:["Spark","Azure","SQL","MSc degree"]},
-  {id:"o2",title:"CIFRE: Data quality & governance for industrial IoT",institution:"Université de Lyon",industry_partner:"Schneider Electric",country:"France",city:"Lyon",program_type:"CIFRE",funding:"≈ 2,300 EUR/month gross",deadline:addDays(9),keywords:["data quality","governance","ETL"],chance:58,match:66,source:"ABG",url:"#",description_text:"CIFRE contract. French required. Candidate must be recruited by the company before ANRT submission.",requires:["French","Airflow","Python"]},
-  {id:"o3",title:"MSCA DN: Knowledge graphs for industrial data platforms",institution:"KU Leuven",industry_partner:"Siemens",country:"Belgium",city:"Leuven",program_type:"MSCA",funding:"≈ 3,400 EUR/month + mobility",deadline:addDays(38),keywords:["knowledge graph","ontologies","data platform"],chance:64,match:70,source:"EURAXESS",url:"#",description_text:"Doctoral network with industrial secondments. Mobility rule: no residence in Belgium for more than 12 months in the last 3 years — fits non-EU applicants.",requires:["Neo4j","Python","English"]},
-  {id:"o4",title:"CASE Studentship: Streaming analytics at scale",institution:"University of Edinburgh",industry_partner:"Rolls-Royce",country:"United Kingdom",city:"Edinburgh",program_type:"CASE",funding:"≈ 2,300 GBP/month",deadline:addDays(-4),keywords:["streaming","Spark"],chance:40,match:55,source:"FindAPhD",url:"#",description_text:"Home-fee status often required; international places limited.",requires:["Kafka","Spark"]},
-  {id:"o5",title:"Doctorado Industrial: MLOps y calidad de datos",institution:"UPC",industry_partner:"Seat",country:"Spain",city:"Barcelona",program_type:"Doctorat Industrial",funding:"≈ 1,900 EUR/month",deadline:addDays(60),keywords:["MLOps","data quality"],chance:49,match:60,source:"AGAUR",url:"#",description_text:"Three-year company–university contract. Spanish or Catalan helpful.",requires:["Docker","Python","Spanish"]},
-  {id:"o6",title:"Nærings-ph.d.: Data platform for energy grids",institution:"NTNU",industry_partner:"Equinor",country:"Norway",city:"Trondheim",program_type:"Nærings-ph.d.",funding:"≈ 5,000 EUR/month",deadline:addDays(5),keywords:["data platform","streaming"],chance:61,match:68,source:"Research Council NO",url:"#",description_text:"Company employs the candidate for 3–4 years. Work permit handled by employer.",requires:["Azure","Spark","English"]}],
+const DEFAULT_STATE={
+ offers:[],
  profile:{name:"Yassir Tagemouati",headline:"Big Data engineering student, EIDIA, UEMF, Fès (2022–2027)",skills:["AWS S3","Azure Synapse","ADF","ADLS Gen2","Key Vault","Snowflake","Spark","Hadoop/HDFS","MapReduce","Airflow","PostgreSQL","SQL","Power BI","Python","Docker","Git","Medallion architecture"],links:{github:"",linkedin:"",portfolio:""},languages:"French (advanced), English (advanced), Arabic (native)",prefs:"Funded or industrial PhD in data engineering, big data, cloud data architecture. Non-EU candidate based in Morocco.",cvs:[]},
- sources:[
-  ["innovfond","Denmark","Industrial PhD (Innovation Fund)","static"],["rcn","Norway","Nærings-ph.d. (RCN)","static"],["miciu","Spain","Doctorados Industriales (MICIU)","static"],["agaur","Spain","Doctorats Industrials (AGAUR)","static"],["vlaio","Belgium","Baekeland (VLAIO)","static"],["win4doc","Belgium","Win4Doc","static"],["ukri","United Kingdom","UKRI CASE","js"],["daad","Germany","DAAD PhD database","js"],["euraxess","EU","EURAXESS / MSCA DN","rss"],["anrt","France","CIFRE (ANRT)","js"],["abg","France","ABG","static"],["adum","France","ADUM","static"],["findaphd","UK","FindAPhD","js"],["acadtransfer","Netherlands","Academic Transfer","rss"]].map(s=>({id:s[0],country:s[1],program:s[2],parser:s[3],enabled:true,health:"unchecked"})),
- contacts:[{name:"Dr. Example Supervisor",email:"supervisor [at] dtu.dk",role:"Associate Professor",org:"DTU",offer_id:"o1",confidence:.7,date_found:today}],
- apps:{o1:"Saved"},
- settings:{ollama:"http://localhost:11434",model:"gemma4:26b",embed:"nomic-embed-text",threshold:50,schedule:"0 7 * * *",lang:"EN",theme:"light",paid:false,privacy:true}
+ sources:[],
+ contacts:[],
+ settings:{provider:"ollama",ollama:"http://localhost:11434",model:"gemma4:26b",gemini_key:"",gemini_key_set:false,gemini_model:"gemini-4-hydrogen",openai_key:"",openai_key_set:false,openai_model:"gpt-6.1-sol",threshold:50,lang:"EN",theme:"light",privacy:true}
 };
-let S=JSON.parse(localStorage.getItem("phdradar")||"null")||structuredClone(DEMO);
-S.logs=S.logs||[];S.reports=S.reports||{};S.f={q:"",country:"",type:"",min:0,hideExp:true,sort:"chance",dir:-1};S.sel=new Set();S.cur=null;S.tab="dash";S.stopping=false;
-const save=()=>{const{f,sel,cur,tab,stopping,...rest}=S;localStorage.setItem("phdradar",JSON.stringify(rest))};
+
+let S=JSON.parse(localStorage.getItem("phdradar")||"null")||structuredClone(DEFAULT_STATE);
+// NEVER restore stale finished crawl bars or old error banners on page open
+delete S.run;
+delete S.apps;
+S.logs=[];
+S.reports=S.reports||{};
+S.f=S.f||{q:"",country:"",type:"",cat:"",min:0,hideExp:true,sort:"chance",dir:-1};
+S.cur=null;
+S.tab=document.cookie.replace(/(?:(?:^|.*;\s*)phdradar_tab\s*\=\s*([^;]*).*$)|^.*$/,"$1")||"dash";
+if(!TABS.some(t=>t[0]===S.tab))S.tab="dash";
+S.stopping=false;
+
+// Persist only offers, reports, filters, and settings — NEVER S.run
+const save=()=>{
+  const{cur,stopping,run,logs,...rest}=S;
+  localStorage.setItem("phdradar",JSON.stringify(rest));
+  document.cookie=`phdradar_tab=${S.tab};path=/;max-age=2592000`;
+};
+
+function clearPageState(){
+  delete S.run;
+  save();
+  location.reload();
+}
+
 const log=m=>{S.logs.unshift(new Date().toLocaleTimeString()+"  "+m);S.logs=S.logs.slice(0,200)};
 function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display="none",2600)}
 async function api(path,opt,ms=30000){
   try{
-    const ctrl = new AbortController();
-    const timeout = setTimeout(() => ctrl.abort(), ms);
-    const r = await fetch("/api"+path, {...opt, signal: ctrl.signal});
+    const ctrl=new AbortController();
+    const timeout=setTimeout(()=>ctrl.abort(),ms);
+    const r=await fetch("/api"+path,{...opt,signal:ctrl.signal});
     clearTimeout(timeout);
-    if(!r.ok) throw new Error(r.statusText);
+    if(!r.ok)return null;
     return await r.json();
-  }catch(e){ return null; }
+  }catch(e){return null}
 }
 const days=d=>d?Math.ceil((new Date(d)-new Date(today))/864e5):null;
 function dl(o){const n=days(o.deadline);if(n===null)return'<span class="pill mut">unknown</span>';if(n<0)return'<span class="pill bad">expired</span>';if(n<=14)return`<span class="pill warn">${n} d left</span>`;return`<span class="pill ok">${o.deadline}</span>`}
-const meter=v=>`<span class="meter"><b style="width:${v}%"></b></span> ${v}%`;
+const pctVal=v=>{const n=parseInt(v,10);return Number.isFinite(n)?Math.max(0,Math.min(100,n)):0};
+const meter=v=>{const p=pctVal(v);return`<span class="meter"><b style="width:${p}%"></b></span> <b>${p}%</b>`};
 function dlFile(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type||"text/plain"}));a.download=name;a.click()}
 
 function setTheme(){document.documentElement.dataset.theme=S.settings.theme}
-function nav(){$("#nav").innerHTML='<div class="logo">PhD<i>·</i>Radar</div>'+TABS.map((t,i)=>`<button data-t="${t[0]}" class="${S.tab==t[0]?"on":""}" title="Key ${i+1}">${t[1]}</button>`).join("")}
+function nav(){
+  $("#nav").innerHTML='<div class="logo">PhD<i>·</i>Radar</div>'
+    +TABS.map((t,i)=>`<button data-t="${t[0]}" class="${S.tab==t[0]?"on":""}" title="Key ${i+1}">${t[1]}</button>`).join("")
+    +'<div style="margin-top:auto;padding-top:12px"><button class="b warn" style="width:100%;font-size:12px" onclick="clearPageState()">Clear Page State</button></div>';
+}
 $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)go(t)};
 function go(t){S.tab=t;nav();render()}
 document.addEventListener("keydown",e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){if(e.key=="Escape")e.target.blur();return}
- const n=+e.key;if(n>=1&&n<=7)go(TABS[n-1][0]);if(e.key=="/"){e.preventDefault();const q=$("#q");if(q)q.focus()}});
-function render(){setTheme();({dash,detail,profile,src,contacts,apps,set}[S.tab])();save()}
+ const n=+e.key;if(n>=1&&n<=TABS.length)go(TABS[n-1][0]);if(e.key=="/"){e.preventDefault();const q=$("#q");if(q)q.focus()}});
+function render(){setTheme();({dash,detail,profile,src,contacts,set}[S.tab]||dash)();save()}
 
-function filtered(){const f=S.f,q=f.q.toLowerCase();let re=null;if(q.startsWith("/")&&q.length>2){try{re=new RegExp(q.slice(1),"i")}catch(e){}}
- const hit=o=>{const h=(o.title+" "+o.institution+" "+o.industry_partner+" "+o.keywords.join(" ")+" "+o.description_text).toLowerCase();
-  if(!q)return true;if(re)return re.test(h);
-  const ors=q.split(/\s+or\s+/);return ors.some(p=>p.split(/\s+and\s+|\s+/).filter(Boolean).every(w=>w[0]=="-"?!h.includes(w.slice(1)):h.includes(w)))};
- return S.offers.filter(o=>hit(o)&&(!f.country||o.country==f.country)&&(!f.type||o.program_type==f.type)&&o.chance>=f.min&&(!f.hideExp||days(o.deadline)===null||days(o.deadline)>=0))
- .sort((a,b)=>{let x=a[f.sort],y=b[f.sort];if(f.sort=="deadline"){x=x||"9";y=y||"9"}return(x>y?1:x<y?-1:0)*f.dir})}
-function dash(){const L=filtered(),opt=k=>[...new Set(S.offers.map(o=>o[k]))].map(v=>`<option ${S.f[k=="program_type"?"type":k]==v?"selected":""}>${esc(v)}</option>`).join("");
- const soon=S.offers.filter(o=>{const n=days(o.deadline);return n!==null&&n>=0&&n<=14}).length,hi=S.offers.filter(o=>o.chance>=S.settings.threshold).length;
- const th=(k,l)=>`<th data-s="${k}">${l}${S.f.sort==k?(S.f.dir<0?" ▾":" ▴"):""}</th>`;
- $("#app").innerHTML=`<h1>Offers</h1>
- ${runCard()}
- <div class="grid" style="margin-bottom:14px"><div class="card"><div class="stat">${S.offers.length}</div>offers collected</div><div class="card"><div class="stat">${hi}</div>above your ${S.settings.threshold}% threshold</div><div class="card"><div class="stat ${soon?"warn":""}">${soon}</div>deadlines within 14 days</div></div>
- <div class="bar"><input id="q" placeholder="Search: spark and azure, -java, or /regex  (press /)" value="${esc(S.f.q)}" style="min-width:260px">
- <select id="fc"><option value="">All countries</option>${opt("country")}</select><select id="ft"><option value="">All programs</option>${opt("program_type")}</select>
- <label style="margin:0">Min chance <input id="fm" type="number" min="0" max="100" value="${S.f.min}" style="width:64px"></label>
- <label style="margin:0"><input id="fe" type="checkbox" ${S.f.hideExp?"checked":""}> hide expired</label>
- <button class="b" id="score">Score all</button><button class="b" id="reset">Clear offers</button><button class="b" id="ics">Deadlines .ics</button><button class="b" id="bulk">Save selected (${S.sel.size})</button></div>
- <div class="tw"><table><thead><tr><th></th>${th("title","Offer")}${th("country","Country")}${th("program_type","Program")}${th("funding","Funding")}${th("deadline","Deadline")}${th("chance","Chance")}</tr></thead><tbody>
- ${L.map(o=>`<tr class="row" data-id="${o.id}"><td><input type="checkbox" class="sel" ${S.sel.has(o.id)?"checked":""}></td><td><b>${esc(o.title)}</b><br><span class="mut">${[o.industry_partner,o.institution,o.city].filter(Boolean).map(esc).join(" · ")||esc(o.source)}</span></td><td>${esc(o.country)}</td><td>${esc(o.program_type)}</td><td>${esc(o.funding)}</td><td>${dl(o)}</td><td>${meter(o.chance)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No offers match. Loosen the filters or run a crawl.</td></tr>'}</tbody></table></div>`;
- const rr=()=>{S.f.q=$("#q").value;render();const q=$("#q");q.focus();q.setSelectionRange(99,99)};
- $("#q").oninput=rr;$("#fc").onchange=e=>{S.f.country=e.target.value;render()};$("#ft").onchange=e=>{S.f.type=e.target.value;render()};
- $("#fm").onchange=e=>{S.f.min=+e.target.value||0;render()};$("#fe").onchange=e=>{S.f.hideExp=e.target.checked;render()};
- document.querySelectorAll("th[data-s]").forEach(h=>h.onclick=()=>{const k=h.dataset.s;S.f.dir=S.f.sort==k?-S.f.dir:-1;S.f.sort=k;render()});
- document.querySelectorAll("tr.row").forEach(r=>r.onclick=e=>{if(e.target.classList.contains("sel")){e.target.checked?S.sel.add(r.dataset.id):S.sel.delete(r.dataset.id);$("#bulk").textContent=`Save selected (${S.sel.size})`;return}S.cur=r.dataset.id;go("detail")});
- $("#score").onclick=scoreAll;$("#reset").onclick=async()=>{if(!confirm("Delete all collected offers?"))return;await api("/offers/reset",{method:"POST"});S.offers=[];render()};$("#ics").onclick=ics;
- $("#bulk").onclick=()=>{S.sel.forEach(id=>S.apps[id]=S.apps[id]||"Saved");toast(S.sel.size+" saved to tracker");S.sel.clear();render()}}
-function runCard(){const r=S.run,en=S.sources.filter(s=>s.enabled).length,on=r&&r.running;
- let btn = "";
- if (on) {
-   if (S.stopping) {
-     btn = `<button class="b p" style="font-size:15px;padding:9px 18px" disabled>Stopping…</button>`;
-   } else {
-     btn = `<button class="b p" style="font-size:15px;padding:9px 18px" disabled>Researching…</button>
-            <button class="b" id="stopBtn" onclick="stopRun()">Stop</button>`;
-   }
- } else {
-   S.stopping = false;
-   btn = `<button class="b p" style="font-size:15px;padding:9px 18px" onclick="crawl()">Start research</button>`;
- }
- return `<div class="card" id="run"><div class="bar" style="margin:0">${btn}<span class="mut">Visits the ${en} enabled sources and collects new offers.</span></div>${r?runBody(r):""}</div>`}
-function runBody(r){const pc=r.total?Math.round(r.done/r.total*100):0,nm=id=>(S.sources.find(s=>s.id==id)||{program:id}).program;
- const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut",skipped:"mut"};
- return (r.msg?`<p class="bad" style="margin:10px 0 0">${esc(r.msg)}</p>`:"")+(r.total?`<p style="margin:10px 0 4px">${meter(pc)} ${r.done}/${r.total} sources, <b>${r.new||0}</b> new offers${r.running?"":" (finished)"}</p>`:"")+
- (r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||s.note||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found+" new":""}${s.note?" · "+esc(s.note):""}</span></span>`).join("")+(r.sources||[]).filter(s=>s.status=="error").map(s=>`<div class="bad" style="font-size:12px;margin-top:4px">${esc(nm(s.id))}: ${esc(s.error)}</div>`).join("")}
+function filtered(){
+  const f=S.f,q=f.q.toLowerCase();
+  const hit=o=>{
+    const h=(o.title+" "+o.institution+" "+o.industry_partner+" "+(o.category||"")+" "+(o.keywords||[]).join(" ")+" "+o.description_text).toLowerCase();
+    if(!q)return true;
+    return q.split(/\s+or\s+/).some(p=>p.split(/\s+and\s+|\s+/).filter(Boolean).every(w=>w[0]=="-"?!h.includes(w.slice(1)):h.includes(w)));
+  };
+  return S.offers.filter(o=>hit(o)&&(!f.country||o.country==f.country)&&(!f.type||o.program_type==f.type)&&(!f.cat||(o.category||"Other STEM")==f.cat)&&pctVal(o.chance)>=f.min&&(!f.hideExp||days(o.deadline)===null||days(o.deadline)>=0))
+  .sort((a,b)=>{let x=a[f.sort],y=b[f.sort];if(f.sort=="deadline"){x=x||"9";y=y||"9"}return(x>y?1:x<y?-1:0)*f.dir});
+}
+
+function dash(){
+  const L=filtered();
+  const opt=k=>[...new Set(S.offers.map(o=>o[k]).filter(Boolean))].map(v=>`<option ${S.f[k=="program_type"?"type":k]==v?"selected":""}>${esc(v)}</option>`).join("");
+  const soon=S.offers.filter(o=>{const n=days(o.deadline);return n!==null&&n>=0&&n<=14}).length;
+  const hi=S.offers.filter(o=>pctVal(o.chance)>=S.settings.threshold).length;
+  const th=(k,l)=>`<th data-s="${k}">${l}${S.f.sort==k?(S.f.dir<0?" ▾":" ▴"):""}</th>`;
+  const activeModel=S.settings.provider=="gemini"?S.settings.gemini_model:S.settings.provider=="openai"?S.settings.openai_model:S.settings.model;
+  $("#app").innerHTML=`<div class="bar" style="justify-content:space-between"><h1>Offers <small class="mut" style="font:13px sans-serif">AI: ${esc(S.settings.provider)} (${esc(activeModel)})</small></h1><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
+  ${runCard()}
+  <div class="grid" style="margin-bottom:14px"><div class="card"><div class="stat">${S.offers.length}</div>offers stored</div><div class="card"><div class="stat">${hi}</div>above ${S.settings.threshold}% acceptance</div><div class="card"><div class="stat ${soon?"warn":""}">${soon}</div>deadlines within 14 days</div></div>
+  <div class="bar">
+    <input id="q" placeholder="Search: spark and azure, -java (press /)" value="${esc(S.f.q)}" style="min-width:220px">
+    <select id="fcat"><option value="">All categories (${S.offers.length})</option>${[...new Set(S.offers.map(o=>o.category||"Other STEM"))].map(v=>`<option value="${esc(v)}" ${S.f.cat==v?"selected":""}>${esc(v)}</option>`).join("")}</select>
+    <select id="fc"><option value="">All countries</option>${opt("country")}</select>
+    <select id="ft"><option value="">All programs</option>${opt("program_type")}</select>
+    <label style="margin:0">Min % <input id="fm" type="number" min="0" max="100" value="${S.f.min}" style="width:60px"></label>
+    <label style="margin:0"><input id="fe" type="checkbox" ${S.f.hideExp?"checked":""}> hide expired</label>
+    <button class="b p" id="score">Score % (Fast)</button>
+    <button class="b" id="reset">Clear DB offers</button>
+    <button class="b" id="ics">Deadlines .ics</button>
+  </div>
+  <div class="tw"><table><thead><tr>${th("title","Offer")}${th("category","Category")}${th("country","Country")}${th("deadline","Deadline")}${th("chance","Accepted %")}</tr></thead><tbody>
+  ${L.map(o=>`<tr class="row" data-id="${o.id}">
+    <td><b>${esc(o.title)}</b><br><span class="mut">${[o.industry_partner,o.institution,o.city].filter(Boolean).map(esc).join(" · ")||esc(o.source)}</span></td>
+    <td><span class="chip">${esc(o.category||"Other STEM")}</span></td>
+    <td>${esc(o.country)}</td>
+    <td>${dl(o)}</td>
+    <td>${meter(o.chance)} <button class="b why-btn" data-wid="${o.id}" style="padding:2px 7px;font-size:12px;margin-left:6px">Why ${pctVal(o.chance)}%?</button></td>
+  </tr>`).join("")||'<tr><td colspan="5" class="mut">No offers match. Run research or adjust filters.</td></tr>'}</tbody></table></div>`;
+
+  const rr=()=>{S.f.q=$("#q").value;render();const q=$("#q");q.focus();q.setSelectionRange(99,99)};
+  $("#q").oninput=rr;
+  $("#fcat").onchange=e=>{S.f.cat=e.target.value;render()};
+  $("#fc").onchange=e=>{S.f.country=e.target.value;render()};
+  $("#ft").onchange=e=>{S.f.type=e.target.value;render()};
+  $("#fm").onchange=e=>{S.f.min=+e.target.value||0;render()};
+  $("#fe").onchange=e=>{S.f.hideExp=e.target.checked;render()};
+  document.querySelectorAll("th[data-s]").forEach(h=>h.onclick=()=>{const k=h.dataset.s;S.f.dir=S.f.sort==k?-S.f.dir:-1;S.f.sort=k;render()});
+  document.querySelectorAll(".why-btn").forEach(b=>b.onclick=e=>{e.stopPropagation();S.cur=b.dataset.wid;go("detail");setTimeout(()=>$("#whyBtn")?.click(),50)});
+  document.querySelectorAll("tr.row").forEach(r=>r.onclick=()=>{S.cur=r.dataset.id;go("detail")});
+  $("#score").onclick=scoreAll;
+  $("#reset").onclick=async()=>{if(!confirm("Delete all collected offers from DB?"))return;await api("/offers/reset",{method:"POST"});S.offers=[];render()};
+  $("#ics").onclick=ics;
+}
+
+function runCard(){
+  const r=S.run,en=S.sources.filter(s=>s.enabled).length,on=r&&r.running;
+  let btn=on?(S.stopping?'<button class="b p" disabled>Stopping…</button>':'<button class="b p" disabled>Researching…</button> <button class="b" onclick="stopRun()">Stop</button>'):'<button class="b p" onclick="crawl()">Start research</button>';
+  return `<div class="card" id="run"><div class="bar" style="margin:0">${btn}<span class="mut">Ready (0%) · Visits ${en} enabled sources.</span></div>${r?runBody(r):""}</div>`;
+}
+function runBody(r){
+  const pc=r.total?Math.round(r.done/r.total*100):0,nm=id=>(S.sources.find(s=>s.id==id)||{program:id}).program;
+  const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut",skipped:"mut"};
+  return (r.msg?`<p class="bad" style="margin:10px 0 0">${esc(r.msg)}</p>`:"")
+    +(r.total?`<p style="margin:10px 0 4px">${meter(pc)} ${r.done}/${r.total} sources, <b>${r.new||0}</b> new offers${r.running?"":" (finished)"}</p>`:"")
+    +(r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||s.note||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found+" new":""}${s.note?" · "+esc(s.note):""}</span></span>`).join("")
+    +(r.sources||[]).filter(s=>s.status=="error").map(s=>`<div class="bad" style="font-size:12px;margin-top:4px">${esc(nm(s.id))}: ${esc(s.error)}</div>`).join("");
+}
 function refreshRun(){const e=$("#run");if(e)e.outerHTML=runCard()}
 async function crawl(){
-  S.stopping = false;
-  const total=S.sources.filter(s=>s.enabled).length;
+  S.stopping=false;const total=S.sources.filter(s=>s.enabled).length;
   S.run={running:true,done:0,total,new:0,sources:[],msg:""};log("Research started on "+total+" sources");refreshRun();
   const r=await api("/crawl/start",{method:"POST"});
-  if(!r){const st=await api("/crawl/status");if(st&&st.running){poll();return}
-  S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. A browser page cannot visit these sites itself. Start the backend with: python run.py"};log("Research failed: backend offline");refreshRun();return}
-  poll()
+  if(!r){S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. Start with: .\\.venv\\Scripts\\python.exe run.py"};refreshRun();return}
+  poll();
 }
 async function poll(){
   const s=await api("/crawl/status");
-  if(!s){S.run={...S.run,running:false,msg:"Lost connection to the backend."};refreshRun();return}
-  S.run={msg:"",...s};
-  if(!s.running) S.stopping = false;
-  refreshRun();
+  if(!s){S.run={...S.run,running:false,msg:"Lost connection to backend."};refreshRun();return}
+  S.run={msg:"",...s};if(!s.running)S.stopping=false;refreshRun();
   if(s.running){setTimeout(poll,1500);return}
-  const o=await api("/offers");if(o)S.offers=o;log("Research finished: "+(s.new||0)+" new offers");toast((s.new||0)+" new offers found");if(S.tab=="dash")render();
+  const o=await api("/offers");if(o)S.offers=o;
+  const ct=await api("/contacts");if(ct)S.contacts=ct;
+  save();
+  log("Research finished: "+(s.new||0)+" new offers");toast((s.new||0)+" new offers found");if(S.tab=="dash")render();
 }
-async function stopRun(){
-  S.stopping = true;
-  refreshRun();
-  await api("/crawl/stop",{method:"POST"});
-  log("Research stop requested");
-}
-async function addOffer(){const v=$("#nu").value.trim();if(!v)return;const r=await api("/offers/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(/^https?:\/\//.test(v)?{url:v}:{text:v})});
- if(r&&r.id){const o=await api("/offers");if(o)S.offers=o;$("#nu").value="";toast("Offer added")}else toast("Could not read it. Paste the offer text instead.")}
-const CT={"Content-Type":"application/json"};
-async function brOpen(){const r=await api("/browser/open",{method:"POST",headers:CT,body:JSON.stringify({url:$("#bu").value.trim()})});toast(r?"Browser opened. Log in, search, then click Capture this page.":"Needs: pip install playwright, then: playwright install chromium")}
-async function brCap(){toast("Reading the page…");const r=await api("/browser/capture",{method:"POST"});if(r){const o=await api("/offers");if(o)S.offers=o;toast(r.added+" offer(s) added from this page")}else toast("Open the browser first, or the page could not be read.")}
-async function brClose(){await api("/browser/close",{method:"POST"});toast("Browser closed")}
-async function scoreAll(){toast("Scoring…");const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})}, 600000);
- if(r){const o=await api("/offers");if(o)S.offers=o;render()}else toast("Scoring needs the backend and Ollama. Demo scores shown.")}
-function ics(){const ev=S.offers.filter(o=>o.deadline).map(o=>`BEGIN:VEVENT\nUID:${o.id}@phdradar\nDTSTART;VALUE=DATE:${o.deadline.replace(/-/g,"")}\nSUMMARY:Deadline: ${o.title.replace(/[,;]/g," ")}\nEND:VEVENT`).join("\n");
- dlFile("phd-deadlines.ics","BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PhD-Radar//EN\n"+ev+"\nEND:VCALENDAR","text/calendar")}
+async function stopRun(){S.stopping=true;refreshRun();await api("/crawl/stop",{method:"POST"})}
 
-function detail(){const o=S.offers.find(x=>x.id==S.cur);if(!o){$("#app").innerHTML='<h1>Report</h1><p class="mut">Pick an offer in the Offers tab to see its full analysis.</p>';return}
- const sk=new Set(S.profile.skills.map(s=>s.toLowerCase())),have=o.requires.filter(r=>[...sk].some(s=>s.includes(r.toLowerCase())||r.toLowerCase().includes(s))),miss=o.requires.filter(r=>!have.includes(r));
- const rep=S.reports[o.id],n=days(o.deadline);
- $("#app").innerHTML=`<div class="bar"><button class="b" id="back">Back to offers</button><button class="b p" id="deep">Run deep analysis</button><button class="b" id="md">Export Markdown</button><button class="b" onclick="print()">Print / PDF</button><select id="st">${["—",...STAGES].map(s=>`<option ${S.apps[o.id]==s?"selected":""}>${s}</option>`).join("")}</select></div>
- <h1>${esc(o.title)}</h1><p class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}, ${esc(o.country)} · ${esc(o.program_type)} · source: ${esc(o.source)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">open original page</a></p>
- <div class="grid"><div class="card"><h3>Chance of success</h3><div class="stat">${o.chance}%</div>${meter(o.chance)}<p class="mut">Hybrid score: skill overlap + embedding similarity + LLM judgement. Profile match ${o.match}%.</p></div>
- <div class="card"><h3>Deadline</h3>${dl(o)}<p>${n===null?"No date found. Check the source page.":n<0?"This offer has closed.":n+" days remaining."}</p><h3>Funding</h3><p>${esc(o.funding)}</p></div>
- <div class="card"><h3>Verdict</h3><span class="pill ${o.chance>=60&&(n===null||n>=0)?"ok":o.chance>=45?"warn":"bad"}">${o.chance>=60&&(n===null||n>=0)?"Go":o.chance>=45?"Maybe":"No-go"}</span><p class="mut">Rule-based until a deep analysis is run.</p></div></div>
- <div class="card"><h3>Skills</h3>${have.map(s=>`<span class="chip g">${esc(s)}</span>`).join("")||'<span class="mut">No overlap found</span>'}<br>${miss.map(s=>`<span class="chip r">${esc(s)}</span>`).join("")}</div>
- <div class="card"><h3>Offer text</h3><p>${esc(o.description_text)}</p></div>
- <div class="card"><h3>Deep report</h3>${rep?`<pre id="rp">${esc(rep)}</pre>`:'<p class="mut">Not generated yet. Deep analysis fetches the full page and any call PDF, then asks Ollama with your whole profile. Every claim must cite a quote from the page.</p>'}</div>
- <div class="card"><h3>Contacts for this offer</h3>${S.contacts.filter(c=>c.offer_id==o.id).map(c=>`<div>${esc(c.name)} · ${esc(c.email)} <span class="mut">${esc(c.role)}</span></div>`).join("")||'<span class="mut">None extracted yet.</span>'}</div>
- <div class="card"><h3>Email draft</h3><textarea id="em" rows="8">${esc(draft(o))}</textarea><div class="bar" style="margin-top:8px"><button class="b" id="eml">Export .eml</button><button class="b p" id="send">Send (asks to confirm)</button></div></div>`;
- $("#back").onclick=()=>go("dash");$("#st").onchange=e=>{e.target.value=="—"?delete S.apps[o.id]:S.apps[o.id]=e.target.value;save()};
- 
- $("#deep").onclick=async()=>{
-  toast("Running deep analysis with "+S.settings.model+" (may take 30-90s)...");
-  try{
-    const res=await fetch("/api/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
+async function scoreAll(){
+  toast(`Fast % scoring via ${S.settings.provider.toUpperCase()}...`);
+  const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})},600000);
+  if(r){
+    const o=await api("/offers");if(o)S.offers=o;
+    toast(`Scored ${r.scored} offers`);render();
+  }else toast("Scoring failed. Check AI provider in .env or Settings.");
+}
+
+function ics(){
+  const ev=S.offers.filter(o=>o.deadline).map(o=>`BEGIN:VEVENT\nUID:${o.id}@phdradar\nDTSTART;VALUE=DATE:${o.deadline.replace(/-/g,"")}\nSUMMARY:Deadline: ${o.title.replace(/[,;]/g," ")}\nEND:VEVENT`).join("\n");
+  dlFile("phd-deadlines.ics","BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PhD-Radar//EN\n"+ev+"\nEND:VCALENDAR","text/calendar");
+}
+
+function detail(){
+  const o=S.offers.find(x=>x.id==S.cur);
+  if(!o){$("#app").innerHTML='<h1>Report</h1><p class="mut">Select an offer in Offers to inspect it.</p>';return}
+  const rep=S.reports[o.id],ch=pctVal(o.chance);
+  $("#app").innerHTML=`<div class="bar"><button class="b" id="back">Back to offers</button><button class="b p" id="whyBtn">Why ${ch}%? (Explain Score)</button><button class="b" id="deep">Full Deep Report</button><button class="b" id="md">Export Markdown</button></div>
+  <h1>${esc(o.title)}</h1><p class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}, ${esc(o.country)} · ${esc(o.program_type)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">open original page</a></p>
+  <div class="grid">
+    <div class="card"><h3>Acceptance Chance</h3><div class="stat">${ch}%</div>${meter(ch)}<p class="mut">Skill match: ${pctVal(o.match)}%</p></div>
+    <div class="card"><h3>Deadline & Funding</h3>${dl(o)}<p>${esc(o.funding||"Funding not stated")}</p></div>
+    <div class="card"><h3>Category</h3><span class="chip">${esc(o.category||"Other STEM")}</span><p class="mut">${(o.requires||[]).map(r=>esc(r)).join(", ")}</p></div>
+  </div>
+  <div class="card"><h3>Why ${ch}%? (On-Demand Explanation)</h3>${o.score_explanation?`<pre>${esc(o.score_explanation)}</pre>`:'<p class="mut">Click <b>Why '+ch+'%?</b> above to generate the explanation on demand (saves tokens during bulk scoring).</p>'}</div>
+  <div class="card"><h3>Offer Text</h3><p>${esc(o.description_text)}</p></div>
+  <div class="card"><h3>Full Deep Report</h3>${rep?`<pre>${esc(rep)}</pre>`:'<p class="mut">Click <b>Full Deep Report</b> for a cited section-by-section evaluation.</p>'}</div>`;
+
+  $("#back").onclick=()=>go("dash");
+  $("#whyBtn").onclick=async()=>{
+    toast("Generating score explanation...");
+    const res=await fetch("/api/offers/"+o.id+"/explain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})});
     const r=await res.json();
-    if(!res.ok){
-      S.reports[o.id]=`# Deep Analysis Error (HTTP ${res.status})\n\n${r.error||res.statusText}\n\nCheck Settings -> Diagnostics or verify Ollama is running with model "${S.settings.model}".`;
-      toast("Analysis failed: "+(r.error||res.statusText));
-    }else{
-      S.reports[o.id]=r.markdown;
-      toast("Deep report ready");
-    }
-  }catch(e){
-    S.reports[o.id]=`# Connection Error\n\n${e.message}`;
-    toast("Backend unreachable");
-  }
-  render();
- };
- $("#md").onclick=()=>dlFile(o.id+"-report.md",S.reports[o.id]||"# "+o.title+"\n\nNo deep report yet.");
- $("#eml").onclick=()=>dlFile(o.id+".eml","Subject: Application: "+o.title+"\nContent-Type: text/plain; charset=utf-8\n\n"+$("#em").value);
- $("#send").onclick=async()=>{if(!confirm("Send this email now?"))return;const r=await api("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({offer_id:o.id,body:$("#em").value})});toast(r?"Sent":"SMTP not configured or backend offline. Use Export .eml.")}}
-function draft(o){const p=S.profile,l=p.links;return `Dear Professor / Hiring team,\n\nI am ${p.name}, a ${p.headline}. I am writing about "${o.title}" (${o.program_type}, ${o.industry_partner}).\n\nMy background in ${p.skills.slice(0,6).join(", ")} matches your requirements, and I recently completed a Smartovate internship on Azure Synapse supply-chain pipelines.\n\nCV attached. ${[l.github&&"GitHub: "+l.github,l.linkedin&&"LinkedIn: "+l.linkedin,l.portfolio&&"Portfolio: "+l.portfolio].filter(Boolean).join(" | ")}\n\nBest regards,\n${p.name}`}
-
-function profile(){const p=S.profile;
- $("#app").innerHTML=`<h1>Profile & CVs</h1><div class="card"><label>Name</label><input id="pn" value="${esc(p.name)}" style="width:100%"><label>Headline</label><input id="ph" value="${esc(p.headline)}" style="width:100%">
- <label>Skills (comma separated)</label><textarea id="ps">${esc(p.skills.join(", "))}</textarea><label>Languages</label><input id="pl" value="${esc(p.languages)}" style="width:100%">
- <label>Preferences and eligibility notes</label><textarea id="pp">${esc(p.prefs)}</textarea>
- <label>GitHub</label><input id="lg" value="${esc(p.links.github)}" style="width:100%"><label>LinkedIn</label><input id="ll" value="${esc(p.links.linkedin)}" style="width:100%"><label>Portfolio</label><input id="lp" value="${esc(p.links.portfolio)}" style="width:100%">
- <div class="bar" style="margin-top:10px"><button class="b p" id="sp">Save profile</button></div></div>
- <div class="card"><h3>CV versions</h3><input type="file" id="cv" accept=".pdf,.docx,.txt,.md" multiple>
- ${p.cvs.map((c,i)=>`<div class="bar" style="margin-top:8px"><b>${esc(c.name)}</b><span class="mut">${c.size} KB · ${c.chars!=null?c.chars+" chars indexed for AI":"uploaded"}</span><button class="b" data-d="${i}">Remove</button></div>`).join("")||'<p class="mut">Upload one CV per focus (data engineering, cloud, research). Full text is extracted for Ollama.</p>'}</div>`;
- $("#sp").onclick=async()=>{Object.assign(p,{name:$("#pn").value,headline:$("#ph").value,skills:$("#ps").value.split(",").map(s=>s.trim()).filter(Boolean),languages:$("#pl").value,prefs:$("#pp").value,links:{github:$("#lg").value,linkedin:$("#ll").value,portfolio:$("#lp").value}});save();await api("/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});toast("Profile saved. Re-score to apply it.")};
-
- $("#cv").onchange=async e=>{
-  for(const f of e.target.files){
-    const fd=new FormData();fd.append("file",f);
-    const res=await api("/cvs",{method:"POST",body:fd});
-    const chars=res&&res.chars?res.chars:0;
-    p.cvs=p.cvs.filter(x=>x.name!==f.name);
-    p.cvs.push({name:f.name,size:Math.round(f.size/1024),chars});
-    toast(`Uploaded ${f.name} (${chars} chars extracted for AI)`);
-  }
-  render();
- };
- 
- document.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{
-  const rem=p.cvs.splice(+b.dataset.d,1)[0];
-  if(rem)await api("/cvs/"+encodeURIComponent(rem.name),{method:"DELETE"});
-  render();
- });
+    if(res.ok){o.score_explanation=r.explanation;save();render()}
+    else toast("Error: "+(r.error||res.statusText));
+  };
+  $("#deep").onclick=async()=>{
+    toast("Running deep analysis...");
+    const res=await fetch("/api/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})});
+    const r=await res.json();
+    S.reports[o.id]=res.ok?r.markdown:`# Error (${res.status})\n\n${r.error||res.statusText}`;
+    render();
+  };
+  $("#md").onclick=()=>dlFile(o.id+"-report.md",S.reports[o.id]||o.score_explanation||"# "+o.title);
 }
+
+function profile(){
+  const p=S.profile;
+  $("#app").innerHTML=`<h1>Profile & CVs</h1><div class="card"><label>Name</label><input id="pn" value="${esc(p.name)}" style="width:100%"><label>Headline</label><input id="ph" value="${esc(p.headline)}" style="width:100%">
+  <label>Skills (comma separated)</label><textarea id="ps">${esc(p.skills.join(", "))}</textarea><label>Languages</label><input id="pl" value="${esc(p.languages)}" style="width:100%">
+  <label>Preferences & Eligibility Notes</label><textarea id="pp">${esc(p.prefs)}</textarea>
+  <div class="bar" style="margin-top:10px"><button class="b p" id="sp">Save profile</button></div></div>
+  <div class="card"><h3>CV Versions (Full Text Extracted for AI)</h3><input type="file" id="cv" accept=".pdf,.docx,.txt,.md" multiple>
+  ${p.cvs.map((c,i)=>`<div class="bar" style="margin-top:8px"><b>${esc(c.name)}</b><span class="mut">${c.size} KB · ${c.chars||0} chars extracted</span><button class="b" data-d="${i}">Remove</button></div>`).join("")||'<p class="mut">Upload your PDF/DOCX CV so all projects, internships, and skills are used by the AI.</p>'}</div>`;
+  $("#sp").onclick=async()=>{Object.assign(p,{name:$("#pn").value,headline:$("#ph").value,skills:$("#ps").value.split(",").map(s=>s.trim()).filter(Boolean),languages:$("#pl").value,prefs:$("#pp").value});save();await api("/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});toast("Profile saved")};
+  $("#cv").onchange=async e=>{for(const f of e.target.files){const fd=new FormData();fd.append("file",f);const res=await api("/cvs",{method:"POST",body:fd});p.cvs=p.cvs.filter(x=>x.name!==f.name);p.cvs.push({name:f.name,size:Math.round(f.size/1024),chars:res?.chars||0});toast(`Extracted ${res?.chars||0} chars from ${f.name}`)}render()};
+  document.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{const rem=p.cvs.splice(+b.dataset.d,1)[0];if(rem)await api("/cvs/"+encodeURIComponent(rem.name),{method:"DELETE"});render()});
+}
+
+async function addOffer(){const v=$("#nu").value.trim();if(!v)return;const r=await api("/offers/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(/^https?:\/\//.test(v)?{url:v}:{text:v})});if(r&&r.id){const o=await api("/offers");if(o)S.offers=o;$("#nu").value="";toast("Offer added")}else toast("Could not read URL")}
+async function brOpen(){const r=await api("/browser/open",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:$("#bu").value.trim()})});toast(r?"Browser opened":"Install Playwright first")}
+async function brCap(){toast("Capturing page proposals...");const r=await api("/browser/capture",{method:"POST"});if(r){const o=await api("/offers");if(o)S.offers=o;toast(r.added+" offer(s) added")}else toast("Open browser first")}
+async function brClose(){await api("/browser/close",{method:"POST"});toast("Browser closed")}
 
 async function src(){
-  const v=await api("/version");
-  const diag=await api("/diagnostics");
-  const r=await api("/sources");if(r&&Array.isArray(r))S.sources=r;
-  
- $("#app").innerHTML=`<h1>Sources & crawler <small class="mut" style="font:13px sans-serif">${v?"backend v"+esc(v.version)+" · "+v.sources+" sources":"OLD backend: replace run.py"}</small></h1>${runCard()}<div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="rs">Reset sources to defaults</button><button class="b" id="dry">Dry run</button></div>
- <div class="card"><input id="nu" placeholder="Paste an offer URL, a career page, or the offer text" style="width:60%"> <button class="b p" onclick="addOffer()">Add as offer</button> <button class="b" id="au">Watch as source</button></div>
- <div class="card"><h3>Assisted browser</h3><p class="mut">For sites that block crawlers or need your login (ADUM, ANRT, LinkedIn…). A real browser window opens: log in and search yourself, then capture the page you are looking at. Logins are kept for later crawls.</p><input id="bu" placeholder="https://…" style="width:55%"> <button class="b p" onclick="brOpen()">Open browser</button> <button class="b" onclick="brCap()">Capture this page</button> <button class="b" onclick="brClose()">Close</button></div>
- 
- ${diag?`<div class="card"><h3>Live System & Page Status</h3>
-  <div class="bar">
-    <span class="pill ${diag.ollama.ok&&!diag.ollama.error?"ok":"bad"}">Ollama: ${diag.ollama.ok?(diag.ollama.error||"OK ("+diag.ollama.configured_model+")"):"OFFLINE ("+diag.ollama.error+")"}</span>
-    <span class="pill ${diag.playwright_installed?"ok":"warn"}">Playwright: ${diag.playwright_installed?"Installed":"Missing"}</span>
-    <span class="pill ok">DB: ${diag.db.offers} offers · ${diag.db.contacts} contacts · ${diag.db.seen_urls} visited URLs</span>
-    <span class="pill ${diag.cvs.length?"ok":"warn"}">CVs indexed: ${diag.cvs.map(c=>c.file+" ("+c.chars+" chars)").join(", ")||"None"}</span>
+  const v=await api("/version"),diag=await api("/diagnostics"),r=await api("/sources");if(Array.isArray(r))S.sources=r;
+  $("#app").innerHTML=`<div class="bar" style="justify-content:space-between"><h1>Sources & Discovery <small class="mut" style="font:13px sans-serif">${v?"v"+esc(v.version)+" · .env: "+(v.env_loaded?"loaded":"missing")+" · data: "+esc(v.data_dir):""}</small></h1><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
+  ${runCard()}
+  ${diag?`<div class="card"><h3>System Status</h3><div class="bar" style="margin:0">
+    <span class="pill ${diag.env_loaded?"ok":"warn"}">.env: ${diag.env_loaded?"Loaded":"Not found"}</span>
+    <span class="pill ${diag.ai.ok?"ok":"bad"}">AI (${esc(diag.ai.provider)}): ${diag.ai.ok?esc(diag.ai.model):esc(diag.ai.error)}</span>
+    <span class="pill ${diag.playwright_installed?"ok":"warn"}">Playwright: ${diag.playwright_installed?"Ready":"Missing"}</span>
+    <span class="pill ok">DB: ${diag.db.offers} offers · ${diag.db.contacts} contacts</span>
+    <span class="pill ${diag.cvs.length?"ok":"warn"}">CVs: ${diag.cvs.length} indexed</span>
+  </div></div>`:""}
+  <div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="rs">Reset sources to defaults</button></div>
+  <div class="card"><h3>Assisted Browser (ADUM & Login Portals)</h3><input id="bu" value="https://adum.fr/as/ed/proposition_Setab.pl" style="width:55%"> <button class="b p" onclick="brOpen()">Open browser</button> <button class="b" onclick="brCap()">Capture this page</button> <button class="b" onclick="brClose()">Close</button></div>
+  <div class="card"><h3>University Portal Discovery Agent (<code>config/universities.yaml</code>)</h3>
+    <div class="bar" style="margin:0">
+      <select id="dcountry"><option value="">All countries (${v?v.universities:0} unis)</option><option>France</option><option>Germany</option><option>Switzerland</option><option>United Kingdom</option><option>Netherlands</option><option>Belgium</option><option>Denmark</option><option>Norway</option><option>Sweden</option><option>Spain</option></select>
+      <input id="dlim" type="number" value="10" min="1" max="150" style="width:65px">
+      <button class="b p" id="drun">Discover University Portals</button>
+    </div><div id="dstat" class="mut" style="font-size:12px;margin-top:6px"></div>
   </div>
-  ${diag.ollama.available_models.length?`<div class="mut" style="font-size:12px">Available Ollama models: ${esc(diag.ollama.available_models.join(", "))}</div>`:""}
-  ${diag.recent_outbound.length?`<details style="margin-top:8px"><summary class="mut" style="cursor:pointer">Recent outbound page requests (${diag.recent_outbound.length})</summary><pre>${esc(diag.recent_outbound.join("\n"))}</pre></details>`:""}
-</div>`:""}
- 
- <div class="tw"><table><thead><tr><th>On</th><th>Country</th><th>Program</th><th>URL</th><th>Health</th></tr></thead><tbody>${S.sources.map((s,i)=>`<tr><td><input type="checkbox" data-i="${i}" ${s.enabled?"checked":""}></td><td>${esc(s.country)}</td><td>${esc(s.program)}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a></td><td class="${s.health=="ok"?"ok":s.health=="broken"?"bad":"mut"}">${esc(s.health)}</td></tr>`).join("")}</tbody></table></div>
- <h3 style="margin-top:16px">Crawl log</h3><pre>${esc(S.logs.join("\n")||"No activity yet.")}</pre>`;
- document.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{S.sources[+c.dataset.i].enabled=c.checked;save();api("/sources/"+S.sources[+c.dataset.i].id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:c.checked})})});
- $("#hc").onclick=async()=>{const h=await api("/sources/health",{method:"POST"});if(h)S.sources=h;else{S.sources.forEach(s=>s.health="unchecked");log("Health check needs the backend")}render()};
- $("#rs").onclick=async()=>{if(!confirm("Replace sources.yaml with the default list? A backup is kept."))return;const h=await api("/sources/reset",{method:"POST"});if(h)S.sources=h;render()};
- $("#dry").onclick=async()=>{const r=await api("/crawl/start?dry=1",{method:"POST"});log(r?"Dry run: "+(r.new||0)+" would be added":"Dry run needs the backend");render()};
- $("#au").onclick=async()=>{const u=$("#nu").value.trim();if(!u)return;const r=await api("/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});S.sources.push({id:"custom"+S.sources.length,country:"Custom",program:u,parser:"auto",enabled:true,health:r?"ok":"unchecked"});render()}}
+  <div class="card"><input id="nu" placeholder="Paste offer URL or text" style="width:60%"> <button class="b p" onclick="addOffer()">Add as offer</button> <button class="b" id="au">Watch as source</button></div>
+  <div class="tw"><table><thead><tr><th>On</th><th>Country</th><th>Program</th><th>URL</th><th>Health</th></tr></thead><tbody>${S.sources.map((s,i)=>`<tr><td><input type="checkbox" data-i="${i}" ${s.enabled?"checked":""}></td><td>${esc(s.country)}</td><td>${esc(s.program)}</td><td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a></td><td class="${s.health=="ok"?"ok":String(s.health).startsWith("broken")?"bad":"mut"}">${esc(s.health)}</td></tr>`).join("")}</tbody></table></div>
+  <h3 style="margin-top:16px">Crawl log</h3><pre>${esc(S.logs.join("\n")||"No activity yet.")}</pre>`;
+
+  document.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{S.sources[+c.dataset.i].enabled=c.checked;save();api("/sources/"+S.sources[+c.dataset.i].id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:c.checked})})});
+  $("#hc").onclick=async()=>{toast("Checking all sources...");const h=await api("/sources/health",{method:"POST"},180000);if(h)S.sources=h;render()};
+  $("#rs").onclick=async()=>{if(!confirm("Reset sources.yaml to defaults?"))return;const h=await api("/sources/reset",{method:"POST"});if(h)S.sources=h;render()};
+  $("#au").onclick=async()=>{const u=$("#nu").value.trim();if(!u)return;await api("/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});const h=await api("/sources");if(h)S.sources=h;render()};
+  $("#drun").onclick=async()=>{
+    const r=await api("/discover/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({country:$("#dcountry").value,limit:+$("#dlim").value||10})});
+    if(!r){toast("Discovery already running");return}
+    const pollD=async()=>{const st=await api("/discover/status");if(!st)return;$("#dstat").innerHTML=`<b>${st.running?"Discovering":"Finished"}:</b> ${st.done}/${st.total} · <b>${st.found}</b> portals added · ${esc(st.current)}<pre style="max-height:110px">${esc((st.log||[]).slice(0,15).join("\n"))}</pre>`;if(st.running)setTimeout(pollD,2000);else{const h=await api("/sources");if(h)S.sources=h;render()}};pollD();
+  };
+}
 
 function contacts(){
- $("#app").innerHTML=`<h1>Contacts</h1><div class="bar"><button class="b p" id="csv">Download contacts.csv</button></div><div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Organization</th><th>Offer</th><th>Confidence</th><th>Found</th></tr></thead><tbody>
- ${S.contacts.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td>${esc(c.role)}</td><td>${esc(c.org)}</td><td>${esc(c.offer_id)}</td><td>${Math.round(c.confidence*100)}%</td><td>${esc(c.date_found)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No contacts yet. They appear after deep analysis.</td></tr>'}</tbody></table></div>`;
- $("#csv").onclick=()=>{const k=["name","email","role","org","offer_id","confidence","date_found"];dlFile("contacts.csv",[k.join(","),...S.contacts.map(c=>k.map(x=>'"'+String(c[x]).replace(/"/g,'""')+'"').join(","))].join("\n"),"text/csv")}}
+  $("#app").innerHTML=`<h1>Contacts</h1><div class="bar"><button class="b p" id="csv">Download contacts.csv</button></div><div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Organization</th><th>Found</th></tr></thead><tbody>
+  ${S.contacts.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td>${esc(c.role)}</td><td>${esc(c.org)}</td><td>${esc(c.date_found)}</td></tr>`).join("")||'<tr><td colspan="5" class="mut">No contacts yet.</td></tr>'}</tbody></table></div>`;
+  $("#csv").onclick=()=>{const k=["name","email","role","org","offer_id","date_found"];dlFile("contacts.csv",[k.join(","),...S.contacts.map(c=>k.map(x=>'"'+String(c[x]||"").replace(/"/g,'""')+'"').join(","))].join("\n"),"text/csv")};
+}
 
-function apps(){
- $("#app").innerHTML=`<h1>Applications</h1><div class="kan">${STAGES.map((st,si)=>`<div class="col"><h3>${st}</h3>${Object.keys(S.apps).filter(id=>S.apps[id]==st).map(id=>{const o=S.offers.find(x=>x.id==id);return o?`<div class="kc"><b>${esc(o.title)}</b><br><span class="mut">${esc(o.industry_partner)} · ${dl(o)}</span><div class="bar" style="margin:6px 0 0">${si?`<button class="b" data-m="${id}" data-to="${si-1}">←</button>`:""}${si<4?`<button class="b" data-m="${id}" data-to="${si+1}">→</button>`:""}<button class="b" data-x="${id}">Remove</button></div></div>`:""}).join("")}</div>`).join("")}</div>`;
- document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{S.apps[b.dataset.m]=STAGES[+b.dataset.to];render()});
- document.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{delete S.apps[b.dataset.x];render()})}
+function set(){
+  const s=S.settings;
+  $("#app").innerHTML=`<h1>Settings</h1><div class="card">
+    <p class="mut" style="margin-top:0">Defaults and API keys are automatically loaded from <code>.env</code> in your project root. Overrides saved here persist in your external data folder.</p>
+    <label>Active AI Provider</label>
+    <select id="provider" style="width:100%">
+      <option value="ollama" ${s.provider=="ollama"?"selected":""}>Local Ollama (Free & Private)</option>
+      <option value="gemini" ${s.provider=="gemini"?"selected":""}>Google Gemini API</option>
+      <option value="openai" ${s.provider=="openai"?"selected":""}>OpenAI API</option>
+    </select>
+    <label>Ollama URL & Model</label>
+    <div class="bar"><input id="ollama" value="${esc(s.ollama)}" style="flex:1"><input id="model" value="${esc(s.model)}" style="flex:1" placeholder="gemma4:26b"></div>
+    <label>Google Gemini API Key & Model ${s.gemini_key_set?'<span class="pill ok">Key loaded from .env / saved</span>':''}</label>
+    <div class="bar"><input id="gemini_key" type="password" value="${esc(s.gemini_key||"")}" placeholder="${s.gemini_key_set?"(Leave blank to keep loaded key)":"AIza..."}" style="flex:1"><input id="gemini_model" value="${esc(s.gemini_model||"gemini-4-hydrogen")}" placeholder="gemini-4-hydrogen" style="flex:1"></div>
+    <label>OpenAI API Key & Model ${s.openai_key_set?'<span class="pill ok">Key loaded from .env / saved</span>':''}</label>
+    <div class="bar"><input id="openai_key" type="password" value="${esc(s.openai_key||"")}" placeholder="${s.openai_key_set?"(Leave blank to keep loaded key)":"sk-..."}" style="flex:1"><input id="openai_model" value="${esc(s.openai_model||"gpt-6.1-sol")}" placeholder="gpt-6.1-sol" style="flex:1"></div>
+    <label>Acceptance Threshold (%)</label><input id="threshold" type="number" value="${esc(s.threshold)}" style="width:100%">
+    <label>Theme</label><select id="theme" style="width:100%"><option value="light" ${s.theme=="light"?"selected":""}>Light</option><option value="dark" ${s.theme=="dark"?"selected":""}>Dark</option></select>
+    <div class="bar" style="margin-top:12px"><button class="b p" id="ss">Save settings</button><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
+  </div>`;
+  $("#ss").onclick=async()=>{
+    ["provider","ollama","model","gemini_key","gemini_model","openai_key","openai_model","theme"].forEach(k=>s[k]=$("#"+k).value);
+    s.threshold=+$("#threshold").value||50;
+    save();await api("/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(s)});
+    const fresh=await api("/settings");if(fresh)Object.assign(S.settings,fresh);
+    setTheme();toast("Settings saved");render();
+  };
+}
 
-function set(){const s=S.settings;const f=(id,l,t="text")=>`<label>${l}</label><input id="${id}" type="${t}" value="${esc(s[id])}" style="width:100%">`;
- $("#app").innerHTML=`<h1>Settings</h1><div class="card">${f("ollama","Ollama URL")}${f("model","Chat model (e.g. gemma4:26b, qwen2.5:14b)")}${f("embed","Embedding model")}${f("threshold","Alert threshold, chance %","number")}${f("schedule","Crawl schedule (cron)")}
- <label>Language</label><select id="lang"><option ${s.lang=="EN"?"selected":""}>EN</option><option ${s.lang=="FR"?"selected":""}>FR</option></select>
- <label>Theme</label><select id="theme"><option value="light" ${s.theme=="light"?"selected":""}>Light</option><option value="dark" ${s.theme=="dark"?"selected":""}>Dark</option></select>
- <label><input type="checkbox" id="paid" ${s.paid?"checked":""}> Allow paid API fallback (off by default)</label><label><input type="checkbox" id="privacy" ${s.privacy?"checked":""}> Privacy mode: log every outbound request</label>
- <div class="bar" style="margin-top:10px"><button class="b p" id="ss">Save settings</button><button class="b" id="bk">Backup JSON</button><label class="b" style="margin:0;cursor:pointer">Restore<input type="file" id="rs" accept=".json" hidden></label></div></div>
- <div class="card"><h3>Shortcuts</h3><p class="mut">1–7 switch tabs. / focuses search. Esc leaves a field.</p></div>`;
- $("#ss").onclick=async()=>{["ollama","model","embed","schedule"].forEach(k=>s[k]=$("#"+k).value);s.threshold=+$("#threshold").value;s.lang=$("#lang").value;s.theme=$("#theme").value;s.paid=$("#paid").checked;s.privacy=$("#privacy").checked;save();await api("/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(s)});setTheme();toast("Settings saved")};
- $("#bk").onclick=()=>{save();dlFile("phd-radar-backup.json",localStorage.getItem("phdradar"),"application/json")};
- $("#rs").onchange=async e=>{try{localStorage.setItem("phdradar",await e.target.files[0].text());location.reload()}catch(x){toast("Not a valid backup")}}}
-
-(async()=>{const st=await api("/crawl/status");if(st&&st.running){S.run=st;poll()}const sr=await api("/sources");if(Array.isArray(sr))S.sources=sr;const o=await api("/offers");if(o)S.offers=o;const p=await api("/profile");if(p&&p.skills)S.profile=p;nav();render()})();
+(async()=>{
+  const st=await api("/crawl/status");
+  if(st&&st.running){S.run=st;poll();}
+  const sr=await api("/sources");if(Array.isArray(sr))S.sources=sr;
+  const o=await api("/offers");if(Array.isArray(o))S.offers=o;
+  const ct=await api("/contacts");if(Array.isArray(ct))S.contacts=ct;
+  const p=await api("/profile");if(p&&p.skills)S.profile=p;
+  const cfgS=await api("/settings");if(cfgS&&cfgS.provider)Object.assign(S.settings,cfgS);
+  nav();render();
+})();
 </script>
 </body>
 </html>

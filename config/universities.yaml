@@ -1,0 +1,41 @@
+universities:
+  # France
+  - {name: "Université Paris-Saclay", country: "France", domain: "universite-paris-saclay.fr"}
+  - {name: "Sorbonne Université", country: "France", domain: "sorbonne-universite.fr"}
+  - {name: "Université PSL", country: "France", domain: "psl.eu"}
+  - {name: "Institut Polytechnique de Paris", country: "France", domain: "ip-paris.fr"}
+  - {name: "Université Grenoble Alpes", country: "France", domain: "univ-grenoble-alpes.fr"}
+  - {name: "INSA Lyon", country: "France", domain: "insa-lyon.fr"}
+  - {name: "Université de Toulouse (Paul Sabatier)", country: "France", domain: "univ-tlse3.fr"}
+  - {name: "INRIA", country: "France", domain: "inria.fr"}
+  - {name: "EURECOM", country: "France", domain: "eurecom.fr"}
+  - {name: "Télécom Paris", country: "France", domain: "telecom-paris.fr"}
+  # Germany
+  - {name: "Technical University of Munich (TUM)", country: "Germany", domain: "tum.de"}
+  - {name: "RWTH Aachen University", country: "Germany", domain: "rwth-aachen.de"}
+  - {name: "Karlsruhe Institute of Technology (KIT)", country: "Germany", domain: "kit.edu"}
+  - {name: "TU Berlin", country: "Germany", domain: "tu.berlin"}
+  - {name: "TU Dresden", country: "Germany", domain: "tu-dresden.de"}
+  - {name: "TU Darmstadt", country: "Germany", domain: "tu-darmstadt.de"}
+  - {name: "Saarland University", country: "Germany", domain: "uni-saarland.de"}
+  - {name: "Max Planck Society", country: "Germany", domain: "mpg.de"}
+  # Switzerland
+  - {name: "ETH Zurich", country: "Switzerland", domain: "ethz.ch"}
+  - {name: "EPFL", country: "Switzerland", domain: "epfl.ch"}
+  - {name: "University of Basel", country: "Switzerland", domain: "unibas.ch"}
+  - {name: "University of Neuchâtel", country: "Switzerland", domain: "unine.ch"}
+  - {name: "University of Fribourg", country: "Switzerland", domain: "unifr.ch"}
+  # United Kingdom, Netherlands, Belgium, Nordics, Spain, Gulf
+  - {name: "University of Oxford", country: "United Kingdom", domain: "ox.ac.uk"}
+  - {name: "University of Cambridge", country: "United Kingdom", domain: "cam.ac.uk"}
+  - {name: "Imperial College London", country: "United Kingdom", domain: "imperial.ac.uk"}
+  - {name: "University of Edinburgh", country: "United Kingdom", domain: "ed.ac.uk"}
+  - {name: "TU Delft", country: "Netherlands", domain: "tudelft.nl"}
+  - {name: "University of Amsterdam", country: "Netherlands", domain: "uva.nl"}
+  - {name: "KU Leuven", country: "Belgium", domain: "kuleuven.be"}
+  - {name: "Technical University of Denmark (DTU)", country: "Denmark", domain: "dtu.dk"}
+  - {name: "NTNU", country: "Norway", domain: "ntnu.edu"}
+  - {name: "KTH Royal Institute of Technology", country: "Sweden", domain: "kth.se"}
+  - {name: "UPC BarcelonaTech", country: "Spain", domain: "upc.edu"}
+  - {name: "KAUST", country: "Saudi Arabia", domain: "kaust.edu.sa"}
+  - {name: "UM6P", country: "Morocco", domain: "um6p.ma"}

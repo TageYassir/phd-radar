@@ -1,0 +1,38 @@
+name: PhD-Radar CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint Python codebase with Ruff
+        run: |
+          ruff check backend run.py tests --select E9,F63,F7,F82
+
+      - name: Validate YAML configs and Python syntax
+        run: |
+          python -c "import yaml; yaml.safe_load(open('config/sources.default.yaml', encoding='utf-8')); yaml.safe_load(open('config/universities.yaml', encoding='utf-8')); print('YAML configs valid')"
+
+      - name: Run pytest test suite
+        run: |
+          pytest -v --tb=short
