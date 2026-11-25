@@ -1,0 +1,7 @@
+needs to make data temp so i don't need to put it in gitignore each time.
+need tofix url.
+add models api.
+fix the button for explain and the percentage of being accepted.
+Maybe in future add link to your github and to your portfolio and try to create a cv based on your work to make it more chance.
+make ui better and save the pages results if you want.
+and also take off the track off applicqtion for nowbecause already have the track on the other app.

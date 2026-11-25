@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pyyaml
+httpx
+beautifulsoup4
+python-multipart
+pytest>=8.0
+ruff>=0.8
