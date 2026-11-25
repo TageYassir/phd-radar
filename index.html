@@ -61,7 +61,6 @@ const STAGES=["Saved","Contacted","Applied","Interview","Result"];
 const today=new Date().toISOString().slice(0,10);
 const addDays=n=>new Date(Date.now()+n*864e5).toISOString().slice(0,10);
 
-/* ---------- state + persistence (works offline with demo data) ---------- */
 const DEMO={
  offers:[
   {id:"o1",title:"Industrial PhD: Lakehouse architectures for supply-chain data",institution:"DTU",industry_partner:"Maersk",country:"Denmark",city:"Copenhagen",program_type:"ErhvervsPhD",funding:"≈ 4,300 EUR/month",deadline:addDays(21),keywords:["lakehouse","Spark","supply chain"],chance:72,match:81,source:"Innovation Fund DK",url:"#",description_text:"Company-employed PhD, 3 years, split between Maersk and DTU. Requires MSc in computer science or data engineering, Spark and cloud experience.",requires:["Spark","Azure","SQL","MSc degree"]},
@@ -75,20 +74,28 @@ const DEMO={
   ["innovfond","Denmark","Industrial PhD (Innovation Fund)","static"],["rcn","Norway","Nærings-ph.d. (RCN)","static"],["miciu","Spain","Doctorados Industriales (MICIU)","static"],["agaur","Spain","Doctorats Industrials (AGAUR)","static"],["vlaio","Belgium","Baekeland (VLAIO)","static"],["win4doc","Belgium","Win4Doc","static"],["ukri","United Kingdom","UKRI CASE","js"],["daad","Germany","DAAD PhD database","js"],["euraxess","EU","EURAXESS / MSCA DN","rss"],["anrt","France","CIFRE (ANRT)","js"],["abg","France","ABG","static"],["adum","France","ADUM","static"],["findaphd","UK","FindAPhD","js"],["acadtransfer","Netherlands","Academic Transfer","rss"]].map(s=>({id:s[0],country:s[1],program:s[2],parser:s[3],enabled:true,health:"unchecked"})),
  contacts:[{name:"Dr. Example Supervisor",email:"supervisor [at] dtu.dk",role:"Associate Professor",org:"DTU",offer_id:"o1",confidence:.7,date_found:today}],
  apps:{o1:"Saved"},
- settings:{ollama:"http://localhost:11434",model:"qwen2.5:14b",embed:"nomic-embed-text",threshold:50,schedule:"0 7 * * *",lang:"EN",theme:"light",paid:false,privacy:true}
+ settings:{ollama:"http://localhost:11434",model:"gemma4:26b",embed:"nomic-embed-text",threshold:50,schedule:"0 7 * * *",lang:"EN",theme:"light",paid:false,privacy:true}
 };
 let S=JSON.parse(localStorage.getItem("phdradar")||"null")||structuredClone(DEMO);
-S.logs=S.logs||[];S.reports=S.reports||{};S.f={q:"",country:"",type:"",min:0,hideExp:true,sort:"chance",dir:-1};S.sel=new Set();S.cur=null;S.tab="dash";
-const save=()=>{const{f,sel,cur,tab,...rest}=S;localStorage.setItem("phdradar",JSON.stringify(rest))};
+S.logs=S.logs||[];S.reports=S.reports||{};S.f={q:"",country:"",type:"",min:0,hideExp:true,sort:"chance",dir:-1};S.sel=new Set();S.cur=null;S.tab="dash";S.stopping=false;
+const save=()=>{const{f,sel,cur,tab,stopping,...rest}=S;localStorage.setItem("phdradar",JSON.stringify(rest))};
 const log=m=>{S.logs.unshift(new Date().toLocaleTimeString()+"  "+m);S.logs=S.logs.slice(0,200)};
 function toast(m){const t=$("#toast");t.textContent=m;t.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display="none",2600)}
-async function api(path,opt){try{const r=await fetch("/api"+path,opt);if(!r.ok)throw 0;return await r.json()}catch(e){return null}}
+async function api(path,opt,ms=30000){
+  try{
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), ms);
+    const r = await fetch("/api"+path, {...opt, signal: ctrl.signal});
+    clearTimeout(timeout);
+    if(!r.ok) throw new Error(r.statusText);
+    return await r.json();
+  }catch(e){ return null; }
+}
 const days=d=>d?Math.ceil((new Date(d)-new Date(today))/864e5):null;
 function dl(o){const n=days(o.deadline);if(n===null)return'<span class="pill mut">unknown</span>';if(n<0)return'<span class="pill bad">expired</span>';if(n<=14)return`<span class="pill warn">${n} d left</span>`;return`<span class="pill ok">${o.deadline}</span>`}
 const meter=v=>`<span class="meter"><b style="width:${v}%"></b></span> ${v}%`;
 function dlFile(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type||"text/plain"}));a.download=name;a.click()}
 
-/* ---------- shell ---------- */
 function setTheme(){document.documentElement.dataset.theme=S.settings.theme}
 function nav(){$("#nav").innerHTML='<div class="logo">PhD<i>·</i>Radar</div>'+TABS.map((t,i)=>`<button data-t="${t[0]}" class="${S.tab==t[0]?"on":""}" title="Key ${i+1}">${t[1]}</button>`).join("")}
 $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)go(t)};
@@ -97,7 +104,6 @@ document.addEventListener("keydown",e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target
  const n=+e.key;if(n>=1&&n<=7)go(TABS[n-1][0]);if(e.key=="/"){e.preventDefault();const q=$("#q");if(q)q.focus()}});
 function render(){setTheme();({dash,detail,profile,src,contacts,apps,set}[S.tab])();save()}
 
-/* ---------- A) offers ---------- */
 function filtered(){const f=S.f,q=f.q.toLowerCase();let re=null;if(q.startsWith("/")&&q.length>2){try{re=new RegExp(q.slice(1),"i")}catch(e){}}
  const hit=o=>{const h=(o.title+" "+o.institution+" "+o.industry_partner+" "+o.keywords.join(" ")+" "+o.description_text).toLowerCase();
   if(!q)return true;if(re)return re.test(h);
@@ -114,45 +120,75 @@ function dash(){const L=filtered(),opt=k=>[...new Set(S.offers.map(o=>o[k]))].ma
  <select id="fc"><option value="">All countries</option>${opt("country")}</select><select id="ft"><option value="">All programs</option>${opt("program_type")}</select>
  <label style="margin:0">Min chance <input id="fm" type="number" min="0" max="100" value="${S.f.min}" style="width:64px"></label>
  <label style="margin:0"><input id="fe" type="checkbox" ${S.f.hideExp?"checked":""}> hide expired</label>
- <button class="b" id="score">Score all</button><button class="b" id="ics">Deadlines .ics</button><button class="b" id="bulk">Save selected (${S.sel.size})</button></div>
+ <button class="b" id="score">Score all</button><button class="b" id="reset">Clear offers</button><button class="b" id="ics">Deadlines .ics</button><button class="b" id="bulk">Save selected (${S.sel.size})</button></div>
  <div class="tw"><table><thead><tr><th></th>${th("title","Offer")}${th("country","Country")}${th("program_type","Program")}${th("funding","Funding")}${th("deadline","Deadline")}${th("chance","Chance")}</tr></thead><tbody>
- ${L.map(o=>`<tr class="row" data-id="${o.id}"><td><input type="checkbox" class="sel" ${S.sel.has(o.id)?"checked":""}></td><td><b>${esc(o.title)}</b><br><span class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}</span></td><td>${esc(o.country)}</td><td>${esc(o.program_type)}</td><td>${esc(o.funding)}</td><td>${dl(o)}</td><td>${meter(o.chance)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No offers match. Loosen the filters or run a crawl.</td></tr>'}</tbody></table></div>`;
+ ${L.map(o=>`<tr class="row" data-id="${o.id}"><td><input type="checkbox" class="sel" ${S.sel.has(o.id)?"checked":""}></td><td><b>${esc(o.title)}</b><br><span class="mut">${[o.industry_partner,o.institution,o.city].filter(Boolean).map(esc).join(" · ")||esc(o.source)}</span></td><td>${esc(o.country)}</td><td>${esc(o.program_type)}</td><td>${esc(o.funding)}</td><td>${dl(o)}</td><td>${meter(o.chance)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No offers match. Loosen the filters or run a crawl.</td></tr>'}</tbody></table></div>`;
  const rr=()=>{S.f.q=$("#q").value;render();const q=$("#q");q.focus();q.setSelectionRange(99,99)};
  $("#q").oninput=rr;$("#fc").onchange=e=>{S.f.country=e.target.value;render()};$("#ft").onchange=e=>{S.f.type=e.target.value;render()};
  $("#fm").onchange=e=>{S.f.min=+e.target.value||0;render()};$("#fe").onchange=e=>{S.f.hideExp=e.target.checked;render()};
  document.querySelectorAll("th[data-s]").forEach(h=>h.onclick=()=>{const k=h.dataset.s;S.f.dir=S.f.sort==k?-S.f.dir:-1;S.f.sort=k;render()});
  document.querySelectorAll("tr.row").forEach(r=>r.onclick=e=>{if(e.target.classList.contains("sel")){e.target.checked?S.sel.add(r.dataset.id):S.sel.delete(r.dataset.id);$("#bulk").textContent=`Save selected (${S.sel.size})`;return}S.cur=r.dataset.id;go("detail")});
- $("#score").onclick=scoreAll;$("#ics").onclick=ics;
+ $("#score").onclick=scoreAll;$("#reset").onclick=async()=>{if(!confirm("Delete all collected offers?"))return;await api("/offers/reset",{method:"POST"});S.offers=[];render()};$("#ics").onclick=ics;
  $("#bulk").onclick=()=>{S.sel.forEach(id=>S.apps[id]=S.apps[id]||"Saved");toast(S.sel.size+" saved to tracker");S.sel.clear();render()}}
 function runCard(){const r=S.run,en=S.sources.filter(s=>s.enabled).length,on=r&&r.running;
- return `<div class="card" id="run"><div class="bar" style="margin:0"><button class="b p" style="font-size:15px;padding:9px 18px" onclick="crawl()" ${on?"disabled":""}>${on?"Researching…":"Start research"}</button>${on?'<button class="b" onclick="stopRun()">Stop</button>':""}<span class="mut">Visits the ${en} enabled sources and collects new offers.</span></div>${r?runBody(r):""}</div>`}
+ let btn = "";
+ if (on) {
+   if (S.stopping) {
+     btn = `<button class="b p" style="font-size:15px;padding:9px 18px" disabled>Stopping…</button>`;
+   } else {
+     btn = `<button class="b p" style="font-size:15px;padding:9px 18px" disabled>Researching…</button>
+            <button class="b" id="stopBtn" onclick="stopRun()">Stop</button>`;
+   }
+ } else {
+   S.stopping = false;
+   btn = `<button class="b p" style="font-size:15px;padding:9px 18px" onclick="crawl()">Start research</button>`;
+ }
+ return `<div class="card" id="run"><div class="bar" style="margin:0">${btn}<span class="mut">Visits the ${en} enabled sources and collects new offers.</span></div>${r?runBody(r):""}</div>`}
 function runBody(r){const pc=r.total?Math.round(r.done/r.total*100):0,nm=id=>(S.sources.find(s=>s.id==id)||{program:id}).program;
- const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut"};
+ const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut",skipped:"mut"};
  return (r.msg?`<p class="bad" style="margin:10px 0 0">${esc(r.msg)}</p>`:"")+(r.total?`<p style="margin:10px 0 4px">${meter(pc)} ${r.done}/${r.total} sources, <b>${r.new||0}</b> new offers${r.running?"":" (finished)"}</p>`:"")+
- (r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found:""}</span></span>`).join("")}
+ (r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||s.note||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found+" new":""}${s.note?" · "+esc(s.note):""}</span></span>`).join("")+(r.sources||[]).filter(s=>s.status=="error").map(s=>`<div class="bad" style="font-size:12px;margin-top:4px">${esc(nm(s.id))}: ${esc(s.error)}</div>`).join("")}
 function refreshRun(){const e=$("#run");if(e)e.outerHTML=runCard()}
-async function crawl(){const total=S.sources.filter(s=>s.enabled).length;
- S.run={running:true,done:0,total,new:0,sources:[],msg:""};log("Research started on "+total+" sources");refreshRun();
- const r=await api("/crawl/start",{method:"POST"});
- if(!r){S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. A browser page cannot visit these sites itself. Start the backend with: python run.py"};log("Research failed: backend offline");refreshRun();return}
- poll()}
-async function poll(){const s=await api("/crawl/status");
- if(!s){S.run={...S.run,running:false,msg:"Lost connection to the backend."};refreshRun();return}
- S.run={msg:"",...s};refreshRun();
- if(s.running){setTimeout(poll,1500);return}
- const o=await api("/offers");if(o)S.offers=o;log("Research finished: "+(s.new||0)+" new offers");toast((s.new||0)+" new offers found");if(S.tab=="dash")render()}
-async function stopRun(){await api("/crawl/stop",{method:"POST"});log("Research stop requested")}
-async function scoreAll(){toast("Scoring…");const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
+async function crawl(){
+  S.stopping = false;
+  const total=S.sources.filter(s=>s.enabled).length;
+  S.run={running:true,done:0,total,new:0,sources:[],msg:""};log("Research started on "+total+" sources");refreshRun();
+  const r=await api("/crawl/start",{method:"POST"});
+  if(!r){const st=await api("/crawl/status");if(st&&st.running){poll();return}
+  S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. A browser page cannot visit these sites itself. Start the backend with: python run.py"};log("Research failed: backend offline");refreshRun();return}
+  poll()
+}
+async function poll(){
+  const s=await api("/crawl/status");
+  if(!s){S.run={...S.run,running:false,msg:"Lost connection to the backend."};refreshRun();return}
+  S.run={msg:"",...s};
+  if(!s.running) S.stopping = false;
+  refreshRun();
+  if(s.running){setTimeout(poll,1500);return}
+  const o=await api("/offers");if(o)S.offers=o;log("Research finished: "+(s.new||0)+" new offers");toast((s.new||0)+" new offers found");if(S.tab=="dash")render();
+}
+async function stopRun(){
+  S.stopping = true;
+  refreshRun();
+  await api("/crawl/stop",{method:"POST"});
+  log("Research stop requested");
+}
+async function addOffer(){const v=$("#nu").value.trim();if(!v)return;const r=await api("/offers/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(/^https?:\/\//.test(v)?{url:v}:{text:v})});
+ if(r&&r.id){const o=await api("/offers");if(o)S.offers=o;$("#nu").value="";toast("Offer added")}else toast("Could not read it. Paste the offer text instead.")}
+const CT={"Content-Type":"application/json"};
+async function brOpen(){const r=await api("/browser/open",{method:"POST",headers:CT,body:JSON.stringify({url:$("#bu").value.trim()})});toast(r?"Browser opened. Log in, search, then click Capture this page.":"Needs: pip install playwright, then: playwright install chromium")}
+async function brCap(){toast("Reading the page…");const r=await api("/browser/capture",{method:"POST"});if(r){const o=await api("/offers");if(o)S.offers=o;toast(r.added+" offer(s) added from this page")}else toast("Open the browser first, or the page could not be read.")}
+async function brClose(){await api("/browser/close",{method:"POST"});toast("Browser closed")}
+async function scoreAll(){toast("Scoring…");const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})}, 600000);
  if(r){const o=await api("/offers");if(o)S.offers=o;render()}else toast("Scoring needs the backend and Ollama. Demo scores shown.")}
 function ics(){const ev=S.offers.filter(o=>o.deadline).map(o=>`BEGIN:VEVENT\nUID:${o.id}@phdradar\nDTSTART;VALUE=DATE:${o.deadline.replace(/-/g,"")}\nSUMMARY:Deadline: ${o.title.replace(/[,;]/g," ")}\nEND:VEVENT`).join("\n");
  dlFile("phd-deadlines.ics","BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//PhD-Radar//EN\n"+ev+"\nEND:VCALENDAR","text/calendar")}
 
-/* ---------- B) detail / report ---------- */
 function detail(){const o=S.offers.find(x=>x.id==S.cur);if(!o){$("#app").innerHTML='<h1>Report</h1><p class="mut">Pick an offer in the Offers tab to see its full analysis.</p>';return}
  const sk=new Set(S.profile.skills.map(s=>s.toLowerCase())),have=o.requires.filter(r=>[...sk].some(s=>s.includes(r.toLowerCase())||r.toLowerCase().includes(s))),miss=o.requires.filter(r=>!have.includes(r));
  const rep=S.reports[o.id],n=days(o.deadline);
  $("#app").innerHTML=`<div class="bar"><button class="b" id="back">Back to offers</button><button class="b p" id="deep">Run deep analysis</button><button class="b" id="md">Export Markdown</button><button class="b" onclick="print()">Print / PDF</button><select id="st">${["—",...STAGES].map(s=>`<option ${S.apps[o.id]==s?"selected":""}>${s}</option>`).join("")}</select></div>
- <h1>${esc(o.title)}</h1><p class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}, ${esc(o.country)} · ${esc(o.program_type)} · source: ${esc(o.source)}</p>
+ <h1>${esc(o.title)}</h1><p class="mut">${esc(o.industry_partner)} · ${esc(o.institution)} · ${esc(o.city)}, ${esc(o.country)} · ${esc(o.program_type)} · source: ${esc(o.source)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">open original page</a></p>
  <div class="grid"><div class="card"><h3>Chance of success</h3><div class="stat">${o.chance}%</div>${meter(o.chance)}<p class="mut">Hybrid score: skill overlap + embedding similarity + LLM judgement. Profile match ${o.match}%.</p></div>
  <div class="card"><h3>Deadline</h3>${dl(o)}<p>${n===null?"No date found. Check the source page.":n<0?"This offer has closed.":n+" days remaining."}</p><h3>Funding</h3><p>${esc(o.funding)}</p></div>
  <div class="card"><h3>Verdict</h3><span class="pill ${o.chance>=60&&(n===null||n>=0)?"ok":o.chance>=45?"warn":"bad"}">${o.chance>=60&&(n===null||n>=0)?"Go":o.chance>=45?"Maybe":"No-go"}</span><p class="mut">Rule-based until a deep analysis is run.</p></div></div>
@@ -162,14 +198,30 @@ function detail(){const o=S.offers.find(x=>x.id==S.cur);if(!o){$("#app").innerHT
  <div class="card"><h3>Contacts for this offer</h3>${S.contacts.filter(c=>c.offer_id==o.id).map(c=>`<div>${esc(c.name)} · ${esc(c.email)} <span class="mut">${esc(c.role)}</span></div>`).join("")||'<span class="mut">None extracted yet.</span>'}</div>
  <div class="card"><h3>Email draft</h3><textarea id="em" rows="8">${esc(draft(o))}</textarea><div class="bar" style="margin-top:8px"><button class="b" id="eml">Export .eml</button><button class="b p" id="send">Send (asks to confirm)</button></div></div>`;
  $("#back").onclick=()=>go("dash");$("#st").onchange=e=>{e.target.value=="—"?delete S.apps[o.id]:S.apps[o.id]=e.target.value;save()};
- $("#deep").onclick=async()=>{toast("Analyzing…");const r=await api("/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
-  S.reports[o.id]=r&&r.markdown?r.markdown:`# ${o.title}\n\n(Demo report: connect the backend and Ollama for a full analysis.)\n\n## Fit\nMatched: ${have.join(", ")||"none"}\nGaps: ${miss.join(", ")||"none"}\n\n## Next actions\n- Tailor CV to the matched skills\n- Contact the supervisor before the deadline`;render()};
+ 
+ $("#deep").onclick=async()=>{
+  toast("Running deep analysis with "+S.settings.model+" (may take 30-90s)...");
+  try{
+    const res=await fetch("/api/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:S.settings.model,profile:S.profile})});
+    const r=await res.json();
+    if(!res.ok){
+      S.reports[o.id]=`# Deep Analysis Error (HTTP ${res.status})\n\n${r.error||res.statusText}\n\nCheck Settings -> Diagnostics or verify Ollama is running with model "${S.settings.model}".`;
+      toast("Analysis failed: "+(r.error||res.statusText));
+    }else{
+      S.reports[o.id]=r.markdown;
+      toast("Deep report ready");
+    }
+  }catch(e){
+    S.reports[o.id]=`# Connection Error\n\n${e.message}`;
+    toast("Backend unreachable");
+  }
+  render();
+ };
  $("#md").onclick=()=>dlFile(o.id+"-report.md",S.reports[o.id]||"# "+o.title+"\n\nNo deep report yet.");
  $("#eml").onclick=()=>dlFile(o.id+".eml","Subject: Application: "+o.title+"\nContent-Type: text/plain; charset=utf-8\n\n"+$("#em").value);
  $("#send").onclick=async()=>{if(!confirm("Send this email now?"))return;const r=await api("/send",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({offer_id:o.id,body:$("#em").value})});toast(r?"Sent":"SMTP not configured or backend offline. Use Export .eml.")}}
 function draft(o){const p=S.profile,l=p.links;return `Dear Professor / Hiring team,\n\nI am ${p.name}, a ${p.headline}. I am writing about "${o.title}" (${o.program_type}, ${o.industry_partner}).\n\nMy background in ${p.skills.slice(0,6).join(", ")} matches your requirements, and I recently completed a Smartovate internship on Azure Synapse supply-chain pipelines.\n\nCV attached. ${[l.github&&"GitHub: "+l.github,l.linkedin&&"LinkedIn: "+l.linkedin,l.portfolio&&"Portfolio: "+l.portfolio].filter(Boolean).join(" | ")}\n\nBest regards,\n${p.name}`}
 
-/* ---------- C) profile ---------- */
 function profile(){const p=S.profile;
  $("#app").innerHTML=`<h1>Profile & CVs</h1><div class="card"><label>Name</label><input id="pn" value="${esc(p.name)}" style="width:100%"><label>Headline</label><input id="ph" value="${esc(p.headline)}" style="width:100%">
  <label>Skills (comma separated)</label><textarea id="ps">${esc(p.skills.join(", "))}</textarea><label>Languages</label><input id="pl" value="${esc(p.languages)}" style="width:100%">
@@ -177,37 +229,68 @@ function profile(){const p=S.profile;
  <label>GitHub</label><input id="lg" value="${esc(p.links.github)}" style="width:100%"><label>LinkedIn</label><input id="ll" value="${esc(p.links.linkedin)}" style="width:100%"><label>Portfolio</label><input id="lp" value="${esc(p.links.portfolio)}" style="width:100%">
  <div class="bar" style="margin-top:10px"><button class="b p" id="sp">Save profile</button></div></div>
  <div class="card"><h3>CV versions</h3><input type="file" id="cv" accept=".pdf,.docx,.txt,.md" multiple>
- ${p.cvs.map((c,i)=>`<div class="bar" style="margin-top:8px"><b>${esc(c.name)}</b><span class="mut">${c.size} KB</span><button class="b" data-d="${i}">Remove</button></div>`).join("")||'<p class="mut">Upload one CV per focus (data engineering, cloud, research) so the best one is picked per offer.</p>'}</div>`;
+ ${p.cvs.map((c,i)=>`<div class="bar" style="margin-top:8px"><b>${esc(c.name)}</b><span class="mut">${c.size} KB · ${c.chars!=null?c.chars+" chars indexed for AI":"uploaded"}</span><button class="b" data-d="${i}">Remove</button></div>`).join("")||'<p class="mut">Upload one CV per focus (data engineering, cloud, research). Full text is extracted for Ollama.</p>'}</div>`;
  $("#sp").onclick=async()=>{Object.assign(p,{name:$("#pn").value,headline:$("#ph").value,skills:$("#ps").value.split(",").map(s=>s.trim()).filter(Boolean),languages:$("#pl").value,prefs:$("#pp").value,links:{github:$("#lg").value,linkedin:$("#ll").value,portfolio:$("#lp").value}});save();await api("/profile",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(p)});toast("Profile saved. Re-score to apply it.")};
- $("#cv").onchange=async e=>{for(const f of e.target.files){const fd=new FormData();fd.append("file",f);await api("/cvs",{method:"POST",body:fd});p.cvs.push({name:f.name,size:Math.round(f.size/1024)})}render()};
- document.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{p.cvs.splice(+b.dataset.d,1);render()})}
 
-/* ---------- D) sources ---------- */
-async function src(){const r=await api("/sources");if(r&&Array.isArray(r))S.sources=r;
- $("#app").innerHTML=`<h1>Sources & crawler</h1>${runCard()}<div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="dry">Dry run</button></div>
- <div class="card"><input id="nu" placeholder="Add any URL or company career page" style="width:70%"> <button class="b" id="au">Add</button></div>
- <div class="tw"><table><thead><tr><th>On</th><th>Country</th><th>Program</th><th>Parser</th><th>Health</th></tr></thead><tbody>${S.sources.map((s,i)=>`<tr><td><input type="checkbox" data-i="${i}" ${s.enabled?"checked":""}></td><td>${esc(s.country)}</td><td>${esc(s.program)}</td><td>${esc(s.parser)}</td><td class="${s.health=="ok"?"ok":s.health=="broken"?"bad":"mut"}">${esc(s.health)}</td></tr>`).join("")}</tbody></table></div>
+ $("#cv").onchange=async e=>{
+  for(const f of e.target.files){
+    const fd=new FormData();fd.append("file",f);
+    const res=await api("/cvs",{method:"POST",body:fd});
+    const chars=res&&res.chars?res.chars:0;
+    p.cvs=p.cvs.filter(x=>x.name!==f.name);
+    p.cvs.push({name:f.name,size:Math.round(f.size/1024),chars});
+    toast(`Uploaded ${f.name} (${chars} chars extracted for AI)`);
+  }
+  render();
+ };
+ 
+ document.querySelectorAll("[data-d]").forEach(b=>b.onclick=async()=>{
+  const rem=p.cvs.splice(+b.dataset.d,1)[0];
+  if(rem)await api("/cvs/"+encodeURIComponent(rem.name),{method:"DELETE"});
+  render();
+ });
+}
+
+async function src(){
+  const v=await api("/version");
+  const diag=await api("/diagnostics");
+  const r=await api("/sources");if(r&&Array.isArray(r))S.sources=r;
+  
+ $("#app").innerHTML=`<h1>Sources & crawler <small class="mut" style="font:13px sans-serif">${v?"backend v"+esc(v.version)+" · "+v.sources+" sources":"OLD backend: replace run.py"}</small></h1>${runCard()}<div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="rs">Reset sources to defaults</button><button class="b" id="dry">Dry run</button></div>
+ <div class="card"><input id="nu" placeholder="Paste an offer URL, a career page, or the offer text" style="width:60%"> <button class="b p" onclick="addOffer()">Add as offer</button> <button class="b" id="au">Watch as source</button></div>
+ <div class="card"><h3>Assisted browser</h3><p class="mut">For sites that block crawlers or need your login (ADUM, ANRT, LinkedIn…). A real browser window opens: log in and search yourself, then capture the page you are looking at. Logins are kept for later crawls.</p><input id="bu" placeholder="https://…" style="width:55%"> <button class="b p" onclick="brOpen()">Open browser</button> <button class="b" onclick="brCap()">Capture this page</button> <button class="b" onclick="brClose()">Close</button></div>
+ 
+ ${diag?`<div class="card"><h3>Live System & Page Status</h3>
+  <div class="bar">
+    <span class="pill ${diag.ollama.ok&&!diag.ollama.error?"ok":"bad"}">Ollama: ${diag.ollama.ok?(diag.ollama.error||"OK ("+diag.ollama.configured_model+")"):"OFFLINE ("+diag.ollama.error+")"}</span>
+    <span class="pill ${diag.playwright_installed?"ok":"warn"}">Playwright: ${diag.playwright_installed?"Installed":"Missing"}</span>
+    <span class="pill ok">DB: ${diag.db.offers} offers · ${diag.db.contacts} contacts · ${diag.db.seen_urls} visited URLs</span>
+    <span class="pill ${diag.cvs.length?"ok":"warn"}">CVs indexed: ${diag.cvs.map(c=>c.file+" ("+c.chars+" chars)").join(", ")||"None"}</span>
+  </div>
+  ${diag.ollama.available_models.length?`<div class="mut" style="font-size:12px">Available Ollama models: ${esc(diag.ollama.available_models.join(", "))}</div>`:""}
+  ${diag.recent_outbound.length?`<details style="margin-top:8px"><summary class="mut" style="cursor:pointer">Recent outbound page requests (${diag.recent_outbound.length})</summary><pre>${esc(diag.recent_outbound.join("\n"))}</pre></details>`:""}
+</div>`:""}
+ 
+ <div class="tw"><table><thead><tr><th>On</th><th>Country</th><th>Program</th><th>URL</th><th>Health</th></tr></thead><tbody>${S.sources.map((s,i)=>`<tr><td><input type="checkbox" data-i="${i}" ${s.enabled?"checked":""}></td><td>${esc(s.country)}</td><td>${esc(s.program)}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.url)}</a></td><td class="${s.health=="ok"?"ok":s.health=="broken"?"bad":"mut"}">${esc(s.health)}</td></tr>`).join("")}</tbody></table></div>
  <h3 style="margin-top:16px">Crawl log</h3><pre>${esc(S.logs.join("\n")||"No activity yet.")}</pre>`;
  document.querySelectorAll("[data-i]").forEach(c=>c.onchange=()=>{S.sources[+c.dataset.i].enabled=c.checked;save();api("/sources/"+S.sources[+c.dataset.i].id,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({enabled:c.checked})})});
  $("#hc").onclick=async()=>{const h=await api("/sources/health",{method:"POST"});if(h)S.sources=h;else{S.sources.forEach(s=>s.health="unchecked");log("Health check needs the backend")}render()};
+ $("#rs").onclick=async()=>{if(!confirm("Replace sources.yaml with the default list? A backup is kept."))return;const h=await api("/sources/reset",{method:"POST"});if(h)S.sources=h;render()};
  $("#dry").onclick=async()=>{const r=await api("/crawl/start?dry=1",{method:"POST"});log(r?"Dry run: "+(r.new||0)+" would be added":"Dry run needs the backend");render()};
  $("#au").onclick=async()=>{const u=$("#nu").value.trim();if(!u)return;const r=await api("/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});S.sources.push({id:"custom"+S.sources.length,country:"Custom",program:u,parser:"auto",enabled:true,health:r?"ok":"unchecked"});render()}}
 
-/* ---------- E) contacts ---------- */
 function contacts(){
  $("#app").innerHTML=`<h1>Contacts</h1><div class="bar"><button class="b p" id="csv">Download contacts.csv</button></div><div class="tw"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Organization</th><th>Offer</th><th>Confidence</th><th>Found</th></tr></thead><tbody>
  ${S.contacts.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.email)}</td><td>${esc(c.role)}</td><td>${esc(c.org)}</td><td>${esc(c.offer_id)}</td><td>${Math.round(c.confidence*100)}%</td><td>${esc(c.date_found)}</td></tr>`).join("")||'<tr><td colspan="7" class="mut">No contacts yet. They appear after deep analysis.</td></tr>'}</tbody></table></div>`;
  $("#csv").onclick=()=>{const k=["name","email","role","org","offer_id","confidence","date_found"];dlFile("contacts.csv",[k.join(","),...S.contacts.map(c=>k.map(x=>'"'+String(c[x]).replace(/"/g,'""')+'"').join(","))].join("\n"),"text/csv")}}
 
-/* ---------- F) applications ---------- */
 function apps(){
  $("#app").innerHTML=`<h1>Applications</h1><div class="kan">${STAGES.map((st,si)=>`<div class="col"><h3>${st}</h3>${Object.keys(S.apps).filter(id=>S.apps[id]==st).map(id=>{const o=S.offers.find(x=>x.id==id);return o?`<div class="kc"><b>${esc(o.title)}</b><br><span class="mut">${esc(o.industry_partner)} · ${dl(o)}</span><div class="bar" style="margin:6px 0 0">${si?`<button class="b" data-m="${id}" data-to="${si-1}">←</button>`:""}${si<4?`<button class="b" data-m="${id}" data-to="${si+1}">→</button>`:""}<button class="b" data-x="${id}">Remove</button></div></div>`:""}).join("")}</div>`).join("")}</div>`;
  document.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{S.apps[b.dataset.m]=STAGES[+b.dataset.to];render()});
  document.querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{delete S.apps[b.dataset.x];render()})}
 
-/* ---------- G) settings ---------- */
 function set(){const s=S.settings;const f=(id,l,t="text")=>`<label>${l}</label><input id="${id}" type="${t}" value="${esc(s[id])}" style="width:100%">`;
- $("#app").innerHTML=`<h1>Settings</h1><div class="card">${f("ollama","Ollama URL")}${f("model","Chat model (e.g. qwen2.5:14b, llama3.1:8b)")}${f("embed","Embedding model")}${f("threshold","Alert threshold, chance %","number")}${f("schedule","Crawl schedule (cron)")}
+ $("#app").innerHTML=`<h1>Settings</h1><div class="card">${f("ollama","Ollama URL")}${f("model","Chat model (e.g. gemma4:26b, qwen2.5:14b)")}${f("embed","Embedding model")}${f("threshold","Alert threshold, chance %","number")}${f("schedule","Crawl schedule (cron)")}
  <label>Language</label><select id="lang"><option ${s.lang=="EN"?"selected":""}>EN</option><option ${s.lang=="FR"?"selected":""}>FR</option></select>
  <label>Theme</label><select id="theme"><option value="light" ${s.theme=="light"?"selected":""}>Light</option><option value="dark" ${s.theme=="dark"?"selected":""}>Dark</option></select>
  <label><input type="checkbox" id="paid" ${s.paid?"checked":""}> Allow paid API fallback (off by default)</label><label><input type="checkbox" id="privacy" ${s.privacy?"checked":""}> Privacy mode: log every outbound request</label>
@@ -217,8 +300,7 @@ function set(){const s=S.settings;const f=(id,l,t="text")=>`<label>${l}</label><
  $("#bk").onclick=()=>{save();dlFile("phd-radar-backup.json",localStorage.getItem("phdradar"),"application/json")};
  $("#rs").onchange=async e=>{try{localStorage.setItem("phdradar",await e.target.files[0].text());location.reload()}catch(x){toast("Not a valid backup")}}}
 
-/* ---------- boot ---------- */
-(async()=>{const st=await api("/crawl/status");if(st&&st.running){S.run=st;poll()}const o=await api("/offers");if(o&&o.length)S.offers=o;const p=await api("/profile");if(p&&p.skills)S.profile=p;nav();render()})();
+(async()=>{const st=await api("/crawl/status");if(st&&st.running){S.run=st;poll()}const sr=await api("/sources");if(Array.isArray(sr))S.sources=sr;const o=await api("/offers");if(o)S.offers=o;const p=await api("/profile");if(p&&p.skills)S.profile=p;nav();render()})();
 </script>
 </body>
 </html>
