@@ -1,6 +1,8 @@
-"""HTTP & Playwright fetching, robots.txt enforcement, HTML detail extraction, and Assisted Browser session."""
+from __future__ import annotations
+"""Modern multi-strategy scraper: Login-Wall Auto-Popup + Sitemap/RSS + JSON-LD + Persistent Playwright + Next-Page Pagination."""
 import hashlib, json, queue, re, threading, time
 import urllib.robotparser as rp
+import xml.etree.ElementTree as ET
 from urllib.parse import urldefrag, urljoin, urlparse
 import httpx
 from bs4 import BeautifulSoup
@@ -18,25 +20,45 @@ HDR = {
 }
 
 PHD_RX = re.compile(
-    r"\b(?:ph\.?d|doctorat|doctoral|doctorate|cifre|erhvervsphd|n[æa]rings-?ph\.?d|baekeland|win4doc|msca|marie\s+sk[łl]odowska|studentship|th[eè]se|doktorand|proposition\s+de\s+th[eè]se|sujet\s+de\s+th[eè]se)\b",
+    r"\b(?:ph\.?d|doctorat|doctoral|doctorate|cifre|erhvervsphd|n[æa]rings-?ph\.?d|baekeland|win4doc|msca|marie\s+sk[łl]odowska|studentship|th[eè]se|doktorand|proposition\s+de\s+th[eè]se|sujet\s+de\s+th[eè]se|fellowship|early\s+stage\s+researcher)\b",
     re.I,
 )
 MENU_NOISE_RX = re.compile(
     r"^(?:login|sign\s*in|register|cookie|privacy|terms|contact|about|home|menu|search|filter|next|previous|page\s*\d+|skip\s*to|connexion|accueil)$",
     re.I,
 )
+LOGIN_WALL_RX = re.compile(
+    r"(?:inscription\s+[ée]tudiant|cr[ée]er\s+votre\s+compte|mot\s+de\s+passe\s+doit\s+contenir|confirmez\s+le\s+mot\s+de\s+passe|se\s+connecter\s+[àa]\s+votre\s+espace|please\s+log\s*in\s+to\s+view|sign\s+in\s+to\s+continue|authentication\s+required)",
+    re.I,
+)
+GENERIC_TITLES = {
+    "job offer",
+    "offres et candidatures cifre",
+    "offre de these",
+    "offre de thèse",
+    "detail",
+    "offer",
+    "job details",
+    "vacancy",
+    "find a job",
+    "search results",
+    "inscription",
+    "connexion",
+    "login",
+    "services for master's students, phd candidates, and phd holders",
+    "services for master’s students, phd candidates, and phd holders",
+}
 EMAIL_RX = re.compile(r"[\w.+-]+\s*(?:@|\[at\]|\(at\))\s*[\w-]+(?:\.[\w-]+)+", re.I)
 SUPERVISOR_RX = re.compile(
     r"(?:directeur\s+de\s+th[eè]se|encadrant|supervisor|contact|responsable|prof\.?|dr\.?)\s*[:\-]?\s*([A-ZÀ-Ý][a-zà-ÿ'-]+(?:\s+[A-ZÀ-Ý][a-zà-ÿ'-]+){1,3})",
     re.I,
 )
 AMT_RX = re.compile(
-    r"(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*[\d,.\s]+(?:/\s*(?:year|yr|month|mo|annum|an|mois))?|[\d,.\s]+\s*(?:€|EUR|CHF|GBP|DKK|NOK|SEK)\s*(?:/\s*(?:year|yr|month|mo|annum|an|mois)|gross|brut|net)?",
+    r"(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*[\d,.\s]+(?:/\s*(?:year|yr|month|mo|annum|an|mois))?|[\d,.\s]+\s*(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*(?:/\s*(?:year|yr|month|mo|annum|an|mois)|gross|brut|net)?",
     re.I,
 )
 FUNDING_RX = re.compile(
-    r"(?:(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*[\d,.\s]+(?:/\s*(?:year|yr|month|mo|annum|an|mois))?|[\d,.\s]+\s*(?:€|EUR|CHF|GBP|DKK|NOK|SEK)\s*(?:/\s*(?:year|yr|month|mo|annum|an|mois)|gross|brut|net)?)"
-    r"|(?:\b(?:fully\s+funded|contrat\s+doctoral|cifre|financement\s+acquis|stipend|salary)\b)",
+    r"(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*[\d,.\s]+(?:/\s*(?:year|yr|month|mo|annum|an|mois))?|[\d,.\s]+\s*(?:€|EUR|CHF|GBP|£|DKK|NOK|SEK)\s*(?:/\s*(?:year|yr|month|mo|annum|an|mois)|gross|brut|net)?|fully\s+funded|contrat\s+doctoral|cifre|financement\s+acquis|stipend|salary",
     re.I,
 )
 MONTHS = {
@@ -48,8 +70,76 @@ DLKEY = r"(?:deadline|closes?|closing|apply\s*by|apply\s*before|date\s*limite|li
 
 BLOCK = threading.Lock()
 ROBOTS = {}
-RUN = {"msg": "", "running": False, "done": 0, "total": 0, "new": 0, "stop": False, "sources": []}
+RUN = {"msg": "", "running": False, "done": 0, "total": 0, "new": 0, "stop": False, "sources": [], "login_prompted": []}
 BR = {"q": queue.Queue(), "t": None}
+
+
+class LoginRequiredError(RuntimeError):
+    """Raised when a page displays a login/registration wall so the UI can pop open a login browser."""
+
+
+def is_login_wall(html_or_text: str) -> bool:
+    soup = BeautifulSoup(html_or_text, "html.parser")
+    has_pw = bool(soup.find("input", {"type": "password"}))
+    txt = soup.get_text(" ", strip=True)[:3500]
+    if LOGIN_WALL_RX.search(txt):
+        return True
+    if has_pw and len(txt) < 2500 and not jobposting(soup):
+        return True
+    return False
+
+
+class CrawlBrowserPool:
+    """Keeps a single persistent Playwright Chromium context open across an entire crawl."""
+
+    def __init__(self):
+        self._pw = None
+        self._ctx = None
+        self._page = None
+
+    def start(self):
+        try:
+            from playwright.sync_api import sync_playwright
+            self._pw = sync_playwright().start()
+            self._ctx = self._pw.chromium.launch_persistent_context(
+                str(DATA / "browser"),
+                headless=True,
+                user_agent=UA,
+                viewport={"width": 1366, "height": 900},
+            )
+            self._page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
+            self._page.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf,mp4}", lambda r: r.abort())
+        except Exception:
+            self.stop()
+
+    def fetch(self, url: str, scroll: bool = False) -> str:
+        if not self._page:
+            return bget(url, scroll=scroll)
+        log_outbound(url, "BROWSER_POOL")
+        self._page.goto(url, wait_until="domcontentloaded", timeout=28000)
+        try:
+            self._page.wait_for_load_state("networkidle", timeout=6000)
+        except Exception:
+            self._page.wait_for_timeout(2000)
+        if scroll:
+            for _ in range(3):
+                self._page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                self._page.wait_for_timeout(900)
+        return self._page.content()
+
+    def stop(self):
+        for obj, fn in ((self._ctx, "close"), (self._pw, "stop")):
+            try:
+                if obj:
+                    getattr(obj, fn)()
+            except Exception:
+                pass
+        self._ctx = None
+        self._pw = None
+        self._page = None
+
+
+POOL = CrawlBrowserPool()
 
 
 def oid(u: str) -> str:
@@ -71,7 +161,7 @@ def allowed(url: str) -> bool:
     return ROBOTS[base].can_fetch("*", url) and ROBOTS[base].can_fetch("PhD-Radar", url)
 
 
-def bget(url: str) -> str:
+def bget(url: str, scroll: bool = False) -> str:
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
@@ -86,17 +176,21 @@ def bget(url: str) -> str:
         )
         try:
             pg = ctx.new_page()
-            pg.goto(url, wait_until="domcontentloaded", timeout=25000)
+            pg.goto(url, wait_until="domcontentloaded", timeout=28000)
             try:
-                pg.wait_for_load_state("networkidle", timeout=6000)
+                pg.wait_for_load_state("networkidle", timeout=7000)
             except Exception:
                 pg.wait_for_timeout(2500)
+            if scroll:
+                for _ in range(3):
+                    pg.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    pg.wait_for_timeout(1000)
             return pg.content()
         finally:
             ctx.close()
 
 
-def get(url: str, mode: str = "auto") -> str:
+def get(url: str, mode: str = "auto", scroll: bool = False) -> str:
     if RUN["stop"]:
         raise RuntimeError("Stopped by user")
     if not allowed(url):
@@ -110,8 +204,8 @@ def get(url: str, mode: str = "auto") -> str:
                 r = httpx.get(url, headers=HDR, timeout=15, follow_redirects=True)
                 r.raise_for_status()
                 html = r.text
-                if mode == "auto" and len(BeautifulSoup(html, "html.parser").find_all("a", href=True)) < 6:
-                    return bget(url)
+                if mode == "auto" and len(BeautifulSoup(html, "html.parser").find_all("a", href=True)) < 8:
+                    return POOL.fetch(url, scroll=scroll)
                 return html
             except httpx.HTTPStatusError as e:
                 if e.response.status_code in (403, 406, 429, 503) and mode == "auto":
@@ -122,8 +216,8 @@ def get(url: str, mode: str = "auto") -> str:
                     if mode == "auto":
                         break
                     raise
-                time.sleep(1)
-    return bget(url)
+                time.sleep(0.8)
+    return POOL.fetch(url, scroll=scroll)
 
 
 def find_deadline(text: str):
@@ -163,27 +257,99 @@ def jobposting(soup):
     return None
 
 
-def links_of(html: str, base: str, minlen: int = 4) -> list[tuple[str, str]]:
+def parse_sitemap_or_feed(xml_text: str, detail_rx=None) -> list[str]:
+    urls = []
+    try:
+        root = ET.fromstring(xml_text)
+        for elem in root.iter():
+            tag = elem.tag.split("}")[-1].lower()
+            if tag in ("loc", "link"):
+                val = (elem.text or elem.attrib.get("href") or "").strip()
+                if val.startswith("http"):
+                    if not detail_rx or detail_rx.search(val):
+                        urls.append(val)
+    except Exception:
+        pass
+    return list(dict.fromkeys(urls))
+
+
+def links_of(html: str, base: str, minlen: int = 3) -> list[tuple[str, str]]:
     seen, out = set(), []
     for a in BeautifulSoup(html, "html.parser").find_all("a", href=True):
         h = urldefrag(urljoin(base, a["href"]))[0]
         tx = a.get_text(" ", strip=True)
-        if not h.startswith("http") or h in seen or len(tx) < minlen:
+        if not h.startswith("http") or h in seen:
+            continue
+        if len(tx) < minlen and not any(k in h.lower() for k in ("/jobs/", "/job/", "/offre/", "id_offre", "/ad/", "/project/")):
             continue
         if MENU_NOISE_RX.match(tx) or any(x in h.lower() for x in ("login", "signin", "signup", "cookie", "privacy", "mailto:", "javascript:")):
             continue
         seen.add(h)
-        out.append((tx, h))
+        out.append((tx or h, h))
     return out
 
 
+def find_next_page_url(html: str, current_url: str) -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    selectors = [
+        'a[rel="next"]',
+        'li.pager__item--next a',
+        'a.next',
+        'a[aria-label*="Next" i]',
+        'a[title*="Next" i]',
+        'a[title*="Go to next page" i]',
+    ]
+    for sel in selectors:
+        tag = soup.select_one(sel)
+        if tag and tag.get("href"):
+            nxt = urldefrag(urljoin(current_url, tag["href"]))[0]
+            if nxt != current_url and nxt.startswith("http"):
+                return nxt
+    for a in soup.find_all("a", href=True):
+        txt = a.get_text(" ", strip=True).lower()
+        if txt in ("next", "next ›", "next »", "suivant", "suivant ›", "›", "»"):
+            nxt = urldefrag(urljoin(current_url, a["href"]))[0]
+            if nxt != current_url and nxt.startswith("http"):
+                return nxt
+    return None
+
+
+def _clean_title(raw: str) -> str:
+    t = re.sub(r"\s+", " ", str(raw or "")).strip()
+    t = re.sub(r"\s*[\|\-–]\s*(?:EURAXESS|ABG|ANRT|Academic\s*Transfer|jobs\.ac\.uk|Jobindex|Jobbnorge).*$", "", t, flags=re.I).strip()
+    return t
+
+
 def detail(url: str, mode: str = "auto", html: str = None) -> dict:
-    soup = BeautifulSoup(html or get(url, mode), "html.parser")
+    raw_html = html or get(url, mode)
+    if is_login_wall(raw_html):
+        raise LoginRequiredError(f"Login required at {url}")
+
+    soup = BeautifulSoup(raw_html, "html.parser")
     jp = jobposting(soup) or {}
+
+    og = soup.find("meta", property="og:title") or soup.find("meta", attrs={"name": "og:title"})
+    og_title = _clean_title(og.get("content") if og else "")
+    page_title = _clean_title(soup.title.get_text(" ", strip=True) if soup.title else "")
+
     for tg in soup(["script", "style", "nav", "footer", "aside"]):
         tg.decompose()
+
     text = soup.get_text(" ", strip=True)
-    h1 = soup.find("h1") or soup.find("h2")
+
+    best_heading = ""
+    for tag in soup.find_all(["h1", "h2", "h3"]):
+        cand = _clean_title(tag.get_text(" ", strip=True))
+        if len(cand) > 10 and cand.lower() not in GENERIC_TITLES:
+            best_heading = cand
+            break
+
+    if not best_heading:
+        if og_title and og_title.lower() not in GENERIC_TITLES:
+            best_heading = og_title
+        elif page_title and page_title.lower() not in GENERIC_TITLES:
+            best_heading = page_title
+
     org = jp.get("hiringOrganization")
     org = org.get("name", "") if isinstance(org, dict) else str(org or "")
     loc = jp.get("jobLocation")
@@ -198,8 +364,12 @@ def detail(url: str, mode: str = "auto", html: str = None) -> dict:
         for e in EMAIL_RX.findall(text + " " + desc)
         if not e.lower().endswith((".png", ".jpg", ".svg", ".webp", "example.com"))
     })
+    final_title = _clean_title(jp.get("title")) or best_heading
+    if final_title.lower() in GENERIC_TITLES:
+        final_title = ""
+
     return {
-        "title": (jp.get("title") or (h1.get_text(" ", strip=True) if h1 else "")).strip(),
+        "title": final_title,
         "institution": org.strip(),
         "city": addr.get("addressLocality", "").strip() if isinstance(addr, dict) else "",
         "deadline": vt if re.match(r"20\d\d-\d\d-\d\d", vt) else find_deadline(text),
@@ -236,7 +406,7 @@ def pick_links(links: list[tuple[str, str]]) -> list[tuple[str, str]]:
         for t, u in links
         if PHD_RX.search(t + " " + u)
         or any(k in u.lower() for k in ("/job/", "/jobs/", "/offre/", "id_offre", "/ad/", "/project/", "/vacancy/", "proposition.pl"))
-    ][:60]
+    ][:100]
     if LLM_STATE["off"]:
         return heuristic
     try:
@@ -246,23 +416,29 @@ def pick_links(links: list[tuple[str, str]]) -> list[tuple[str, str]]:
         return heuristic
 
 
-def process(s: dict, urls: list[str], kws: list[str], known: set[str], mode: str = "auto", limit: int = 100, dry: bool = False, html_fetcher=None) -> int:
+def process(s: dict, urls: list[str], kws: list[str], known: set[str], mode: str = "auto", limit: int = 120, dry: bool = False, html_fetcher=None) -> int:
     n = 0
     existing_fps = {offer_fingerprint(x.get("title", ""), x.get("institution", "")) for x in offers()}
     for u in [u for u in urls if oid(u) not in known][:limit]:
         if RUN["stop"]:
             break
-        known.add(oid(u))
-        time.sleep(0.7)
+        time.sleep(0.35)
         try:
             raw_html = html_fetcher(u) if html_fetcher else None
             d = detail(u, mode, html=raw_html)
+        except LoginRequiredError:
+            raise
         except Exception:
             continue
+
         o = make_offer(s, u, d, kws)
         fp = offer_fingerprint(o["title"], o["institution"])
-        has_phd_signal = bool(PHD_RX.search(norm(o["title"] + " " + o["description_text"][:1800]))) or ("proposition.pl" in u.lower())
-        if o["title"] and len(o["title"]) > 8 and has_phd_signal and fp not in existing_fps:
+        has_phd_signal = bool(PHD_RX.search(norm(o["title"] + " " + o["description_text"][:2000]))) or ("proposition.pl" in u.lower())
+
+        if o["title"] and len(o["title"]) > 8 and has_phd_signal:
+            known.add(oid(u))
+            if fp in existing_fps:
+                continue
             llm_enrich_offer(o)
             if o.pop("_reject", False):
                 with LOCK:
@@ -273,7 +449,10 @@ def process(s: dict, urls: list[str], kws: list[str], known: set[str], mode: str
             if not dry:
                 put_offer(o)
             n += 1
+        elif len(d.get("description_text", "")) > 400 and not o["title"]:
+            continue
         else:
+            known.add(oid(u))
             with LOCK:
                 DB.execute("INSERT OR IGNORE INTO seen VALUES(?)", (oid(u),))
                 DB.commit()
@@ -284,21 +463,42 @@ def listing(s: dict, kws: list[str], known: set[str], dry: bool = False) -> tupl
     rx = re.compile(s["detail"]) if s.get("detail") else None
     cands = {}
     mode = s.get("fetch", "auto")
-    for u in s.get("urls") or [s["url"]]:
-        if RUN["stop"]:
+    max_pages = int(s.get("pages", 8))
+
+    if s["url"].endswith(".xml") or "/feed" in s["url"] or "sitemap" in s["url"]:
+        xml_txt = get(s["url"], "http")
+        for u in parse_sitemap_or_feed(xml_txt, rx):
+            cands.setdefault(u, 1)
+        return process(s, list(cands), kws, known, mode, s.get("max_detail", 120), dry=dry), len(cands)
+
+    visited_pages = set()
+    curr_url = s["url"]
+    for _ in range(max_pages):
+        if not curr_url or curr_url in visited_pages or RUN["stop"]:
             break
-        html = get(u, mode)
-        page_links = links_of(html, u, 4)
+        visited_pages.add(curr_url)
+        html = get(curr_url, mode, scroll=True)
+        if is_login_wall(html):
+            raise LoginRequiredError(f"Login required at {curr_url}")
+
+        page_links = links_of(html, curr_url, 3)
+        before = len(cands)
         if rx:
             for _, h in page_links:
                 m = rx.search(h)
                 if m:
                     cands.setdefault(h[: m.end()], 1)
-        if not cands:
+        if len(cands) == before:
             for _, h in pick_links(page_links):
                 cands.setdefault(h, 1)
-        time.sleep(0.7)
-    return process(s, list(cands), kws, known, mode, s.get("max_detail", 100), dry=dry), len(cands)
+
+        next_url = find_next_page_url(html, curr_url)
+        if not next_url or len(cands) == before:
+            break
+        curr_url = next_url
+        time.sleep(0.4)
+
+    return process(s, list(cands), kws, known, mode, s.get("max_detail", 120), dry=dry), len(cands)
 
 
 def watch(s: dict) -> str:
@@ -312,6 +512,21 @@ def watch(s: dict) -> str:
     return note
 
 
+def open_interactive_login_browser(url: str) -> bool:
+    """Opens a visible Chromium window sharing DATA/browser so user login cookies persist for future crawls."""
+    try:
+        import playwright  # noqa: F401
+    except ImportError:
+        return False
+    if BR["t"] and BR["t"].is_alive():
+        box = {"ev": threading.Event()}
+        BR["q"].put(("goto_and_get", (url, box)))
+        return True
+    BR["t"] = threading.Thread(target=browser_session, args=(url,), daemon=True)
+    BR["t"].start()
+    return True
+
+
 def _crawl_job(dry: bool = False) -> None:
     c = cfg()
     en = [s for s in c["sources"] if s.get("enabled", True)]
@@ -323,33 +538,49 @@ def _crawl_job(dry: bool = False) -> None:
         total=len(en),
         new=0,
         stop=False,
+        login_prompted=[],
         sources=[{"id": s["id"], "status": "waiting"} for s in en],
     )
-    for i, s in enumerate(en):
-        if RUN["stop"]:
-            break
-        st = RUN["sources"][i]
-        st["status"] = "running"
-        try:
-            if s.get("kind", "watch") == "watch":
-                st.update(status="ok", found=0, note="guide/call: " + watch(s))
-            else:
-                n, seen = listing(s, c.get("keywords", []), known, dry=dry)
-                st.update(status="ok", found=n, note=f"{seen} links" if seen else "0 matching links")
-                RUN["new"] += n
-        except Exception as e:
-            err = str(e)
-            if "needs playwright" in err.lower():
-                st.update(status="skipped", note="Install Playwright or use Assisted Browser")
-            elif "blocked by robots.txt" in err.lower():
-                st.update(status="skipped", note="Blocked by robots.txt -> open in Assisted Browser")
-            elif "stopped by user" in err.lower():
-                st.update(status="skipped", note="Stopped")
-            else:
-                st.update(status="error", error=f"{type(e).__name__}: {err}"[:200])
-        RUN["done"] += 1
-        time.sleep(0.3)
-    RUN["running"] = False
+    POOL.start()
+    try:
+        for i, s in enumerate(en):
+            if RUN["stop"]:
+                break
+            st = RUN["sources"][i]
+            st["status"] = "running"
+            try:
+                if s.get("kind", "watch") == "watch":
+                    st.update(status="ok", found=0, note="guide/call: " + watch(s))
+                else:
+                    n, seen = listing(s, c.get("keywords", []), known, dry=dry)
+                    st.update(status="ok", found=n, note=f"{seen} links" if seen else "0 matching links")
+                    RUN["new"] += n
+            except LoginRequiredError:
+                # Pause pool lock briefly, pop open a visible browser window so the user can log in once
+                POOL.stop()
+                opened = open_interactive_login_browser(s["url"])
+                if opened and s["url"] not in RUN["login_prompted"]:
+                    RUN["login_prompted"].append(s["url"])
+                st.update(
+                    status="needs_login",
+                    note="Login window opened — sign in once, then click Start research again",
+                )
+                POOL.start()
+            except Exception as e:
+                err = str(e)
+                if "needs playwright" in err.lower():
+                    st.update(status="skipped", note="Install Playwright or use Assisted Browser")
+                elif "blocked by robots.txt" in err.lower():
+                    st.update(status="skipped", note="Blocked by robots.txt -> open in Assisted Browser")
+                elif "stopped by user" in err.lower():
+                    st.update(status="skipped", note="Stopped")
+                else:
+                    st.update(status="error", error=f"{type(e).__name__}: {err}"[:200])
+            RUN["done"] += 1
+            time.sleep(0.2)
+    finally:
+        POOL.stop()
+        RUN["running"] = False
 
 
 def crawl_job(dry: bool = False) -> None:
@@ -395,7 +626,7 @@ def ingest_html(url: str, html: str) -> int:
     kws = cfg().get("keywords", [])
     known = {o["id"] for o in offers()}
     soup = BeautifulSoup(html, "html.parser")
-    all_links = links_of(html, url, 4)
+    all_links = links_of(html, url, 3)
 
     adum_links = [h for _, h in all_links if "proposition.pl" in h.lower()]
     if adum_links:
@@ -410,7 +641,7 @@ def ingest_html(url: str, html: str) -> int:
 
     picks = [] if jobposting(soup) else pick_links(all_links)
     if len(picks) >= 2:
-        return process(s, [h for _, h in picks], kws, known, "auto", limit=100)
+        return process(s, [h for _, h in picks], kws, known, "auto", limit=120)
     o = make_offer(s, url, detail(url, html=html), kws)
     llm_enrich_offer(o)
     put_offer(o)

@@ -1,4 +1,4 @@
-version: 7
+version: 9
 keywords:
 - data engineering
 - big data
@@ -24,6 +24,15 @@ keywords:
 - supply chain
 - industrial AI
 - distributed
+- PhD
+- doctoral
+- bioinformatics
+- physics
+- chemistry
+- materials
+- energy
+- robotics
+- healthcare
 sources:
 - id: euraxess-ind
   kind: listing
@@ -41,12 +50,12 @@ sources:
   url: https://euraxess.ec.europa.eu/jobs/search?keywords=MSCA
   detail: /jobs/\d+
   enabled: true
-- id: euraxess-priv
+- id: euraxess-all-phd
   kind: listing
   fetch: browser
   country: EU
-  program: EURAXESS Private Sector
-  url: https://euraxess.ec.europa.eu/jobs/search?keywords=private%20sector%20phd
+  program: EURAXESS All PhD Positions
+  url: https://euraxess.ec.europa.eu/jobs/search?keywords=PhD
   detail: /jobs/\d+
   enabled: true
 - id: adum-setab
@@ -72,20 +81,12 @@ sources:
   program: ANRT CIFRE hub (France-Maroc scheme)
   url: https://www.anrt.asso.fr/fr/deposez-vos-offres-12588
   enabled: true
-- id: abg-data
+- id: abg-all
   kind: listing
   fetch: auto
   country: France
-  program: ABG data science
-  url: https://abg.asso.fr/en/recruitment/thesis-topic/data-science-storage-security-measurement-analysis
-  detail: id_offre/\d+
-  enabled: true
-- id: abg-cs
-  kind: listing
-  fetch: auto
-  country: France
-  program: ABG computer science
-  url: https://abg.asso.fr/en/recruitment/thesis-topic/computer-science
+  program: ABG All PhD Offers
+  url: https://abg.asso.fr/en/recruitment/thesis-topic
   detail: id_offre/\d+
   enabled: true
 - id: abg-carriere
@@ -100,15 +101,15 @@ sources:
   fetch: browser
   country: Switzerland
   program: ETH Zurich Doctoral Positions
-  url: https://jobs.ethz.ch/site/index?q=doctoral+data
+  url: https://jobs.ethz.ch/site/index?q=doctoral
   detail: /job/view/
   enabled: true
 - id: epfl-phd
   kind: watch
   fetch: auto
   country: Switzerland
-  program: EPFL Doctoral School (EDIC)
-  url: https://www.epfl.ch/education/phd/edic-computer-and-communication-sciences/
+  program: EPFL Doctoral School
+  url: https://www.epfl.ch/education/phd/
   enabled: true
 - id: ifd
   kind: watch
@@ -121,8 +122,8 @@ sources:
   kind: listing
   fetch: browser
   country: Denmark
-  program: Jobindex ErhvervsPhD
-  url: https://www.jobindex.dk/jobsoegning?q=phd+erhvervsphd&lang=en
+  program: Jobindex PhD & ErhvervsPhD
+  url: https://www.jobindex.dk/jobsoegning?q=phd&lang=en
   detail: /job/\d+
   enabled: true
 - id: ku-ind
@@ -143,7 +144,7 @@ sources:
   kind: listing
   fetch: auto
   country: Norway
-  program: Jobbnorge PhD
+  program: Jobbnorge All PhD
   url: https://www.jobbnorge.no/search/en?term=phd
   detail: /job/\d+
   enabled: true
@@ -175,12 +176,12 @@ sources:
   program: Win4Doc
   url: https://www.wallonie.be/fr/demarches/realiser-une-these-de-doctorat-en-entreprise-win4doc
   enabled: true
-- id: findaphd-case
+- id: findaphd-all
   kind: listing
   fetch: browser
   country: United Kingdom
-  program: FindAPhD CASE
-  url: https://www.findaphd.com/phds/united-kingdom/?g0w900&Keywords=case+studentship
+  program: FindAPhD All UK PhDs
+  url: https://www.findaphd.com/phds/united-kingdom/?g0w900
   detail: /phds/project/[^?]+\?p\d+
   enabled: true
 - id: ukri
@@ -194,8 +195,8 @@ sources:
   kind: listing
   fetch: browser
   country: United Kingdom
-  program: jobs.ac.uk
-  url: https://www.jobs.ac.uk/search/?keywords=phd+data+engineering
+  program: jobs.ac.uk All PhDs
+  url: https://www.jobs.ac.uk/jobs/phd-studentships
   detail: /job/[A-Z]{3}\d+
   enabled: true
 - id: siemens
@@ -231,23 +232,295 @@ sources:
   kind: listing
   fetch: browser
   country: Germany
-  program: Academics.de
-  url: https://www.academics.de/jobs?keywords=phd+data
+  program: Academics.com All PhDs
+  url: https://www.academics.com/jobs?keywords=phd
   detail: /jobs/\d+
   enabled: true
 - id: acadpos
   kind: listing
   fetch: browser
   country: Europe
-  program: AcademicPositions
-  url: https://academicpositions.com/find-jobs?keyword=phd+data+engineering
+  program: AcademicPositions All PhDs
+  url: https://academicpositions.com/find-jobs?keyword=phd
   detail: /ad/.+?/\d+
   enabled: true
 - id: acadtransfer
   kind: listing
   fetch: auto
   country: Netherlands
-  program: Academic Transfer
-  url: https://www.academictransfer.com/en/jobs/?q=phd+data
+  program: Academic Transfer All PhDs
+  url: https://www.academictransfer.com/en/jobs/?q=phd
   detail: /en/jobs/\d+
+  enabled: true
+- id: uni-d9911f
+  kind: listing
+  fetch: auto
+  country: France
+  program: Université de Toulouse (Paul Sabatier) PhD Portal
+  url: https://www.utoulouse.fr/au-quotidien/jobs
+  max_detail: 30
+  enabled: true
+- id: uni-62737c
+  kind: listing
+  fetch: auto
+  country: France
+  program: INRIA PhD Portal
+  url: https://www.inria.fr/phd
+  max_detail: 30
+  enabled: true
+- id: uni-22dfc8
+  kind: listing
+  fetch: auto
+  country: France
+  program: Télécom Paris PhD Portal
+  url: https://www.telecom-paris.fr/phd-defense-hussein-chouman-impairment-aware-design-and-performance-evaluation-of-all-optical-wavelength-convertible-networks
+  max_detail: 30
+  enabled: true
+- id: uni-888400
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: Technical University of Munich (TUM) PhD Portal
+  url: https://www.tum.de/en/about-tum/careers-and-jobs/doctorate
+  max_detail: 30
+  enabled: true
+- id: uni-348593
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: RWTH Aachen University PhD Portal
+  url: https://www.rwth-aachen.de/cms/root/Studium/Nach-dem-Studium/~ejw/Promotion/?lidx=1
+  max_detail: 30
+  enabled: true
+- id: uni-dc6338
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: TU Darmstadt PhD Portal
+  url: https://www.tu-darmstadt.de/forschen/wissenschaftlicher_nachwuchs_tu/promotionsinteressierte_tu/index.en.jsp
+  max_detail: 30
+  enabled: true
+- id: uni-587935
+  kind: listing
+  fetch: auto
+  country: Switzerland
+  program: ETH Zurich PhD Portal
+  url: https://ethz.ch/students/en/doctorate.html
+  max_detail: 30
+  enabled: true
+- id: uni-5c5be6
+  kind: listing
+  fetch: auto
+  country: Switzerland
+  program: University of Basel PhD Portal
+  url: https://www.unibas.ch/de/Jobs-und-Karriere/Offene-Stellen.html
+  max_detail: 30
+  enabled: true
+- id: uni-38d43d
+  kind: listing
+  fetch: auto
+  country: Switzerland
+  program: University of Fribourg PhD Portal
+  url: https://www.unifr.ch/graduatecampus/en/
+  max_detail: 30
+  enabled: true
+- id: uni-0e585f
+  kind: listing
+  fetch: auto
+  country: United Kingdom
+  program: University of Cambridge PhD Portal
+  url: https://www.postgraduate.study.cam.ac.uk/courses/qualifications/phd
+  max_detail: 30
+  enabled: true
+- id: uni-933aae
+  kind: listing
+  fetch: auto
+  country: United Kingdom
+  program: Imperial College London PhD Portal
+  url: https://www.imperial.ac.uk/jobs/
+  max_detail: 30
+  enabled: true
+- id: uni-610f5d
+  kind: listing
+  fetch: auto
+  country: United Kingdom
+  program: University of Edinburgh PhD Portal
+  url: https://www.ed.ac.uk/jobs
+  max_detail: 30
+  enabled: true
+- id: uni-f083b1
+  kind: listing
+  fetch: auto
+  country: Netherlands
+  program: TU Delft PhD Portal
+  url: https://www.tudelft.nl/onderwijs/opleidingen/phd
+  max_detail: 30
+  enabled: true
+- id: uni-21a6ad
+  kind: listing
+  fetch: auto
+  country: Netherlands
+  program: University of Amsterdam PhD Portal
+  url: https://www.uva.nl/en/phd
+  max_detail: 30
+  enabled: true
+- id: uni-ab9889
+  kind: listing
+  fetch: auto
+  country: Belgium
+  program: KU Leuven PhD Portal
+  url: https://research.kuleuven.be/en/career/phd/index
+  max_detail: 30
+  enabled: true
+- id: uni-d27e6b
+  kind: listing
+  fetch: auto
+  country: Denmark
+  program: Technical University of Denmark (DTU) PhD Portal
+  url: https://www.dtu.dk/uddannelse/phd
+  max_detail: 30
+  enabled: true
+- id: uni-4f475d
+  kind: listing
+  fetch: auto
+  country: Norway
+  program: NTNU PhD Portal
+  url: https://www.ntnu.edu/phd
+  max_detail: 30
+  enabled: true
+- id: uni-94c2e7
+  kind: listing
+  fetch: auto
+  country: Sweden
+  program: KTH Royal Institute of Technology PhD Portal
+  url: https://www.kth.se/en/studies/phd
+  max_detail: 30
+  enabled: true
+- id: uni-8121b0
+  kind: listing
+  fetch: auto
+  country: Saudi Arabia
+  program: KAUST PhD Portal
+  url: https://www.kaust.edu.sa/en/error/404?404;https://www.kaust.edu.sa:443/phd
+  max_detail: 30
+  enabled: true
+- id: uni-d305f3
+  kind: listing
+  fetch: auto
+  country: Morocco
+  program: UM6P PhD Portal
+  url: https://www.um6p.ma/phd
+  max_detail: 30
+  enabled: true
+- id: uni-b2fad9
+  kind: listing
+  fetch: auto
+  country: France
+  program: Université Paris-Saclay PhD Portal
+  url: https://www.universite-paris-saclay.fr/recherche/doctorat-et-habilitation-diriger-des-recherches-hdr
+  max_detail: 30
+  enabled: true
+- id: uni-a4830c
+  kind: listing
+  fetch: auto
+  country: France
+  program: Sorbonne Université PhD Portal
+  url: https://www.sorbonne-universite.fr/recherche-et-innovation/le-doctorat/candidature-et-admission
+  max_detail: 30
+  enabled: true
+- id: uni-c16bab
+  kind: listing
+  fetch: auto
+  country: France
+  program: Université PSL PhD Portal
+  url: https://www.psl.eu/recherche/doctorat-et-post-doctorat
+  max_detail: 30
+  enabled: true
+- id: uni-b29131
+  kind: listing
+  fetch: auto
+  country: France
+  program: Institut Polytechnique de Paris PhD Portal
+  url: https://www.ip-paris.fr/education/doctorat
+  max_detail: 30
+  enabled: true
+- id: uni-eab5bf
+  kind: listing
+  fetch: auto
+  country: France
+  program: Université Grenoble Alpes PhD Portal
+  url: https://doctorat.univ-grenoble-alpes.fr
+  max_detail: 30
+  enabled: true
+- id: uni-5fdb33
+  kind: listing
+  fetch: auto
+  country: France
+  program: INSA Lyon PhD Portal
+  url: https://www.insa-lyon.fr/fr/formations-insa-lyon/formation-doctorale
+  max_detail: 30
+  enabled: true
+- id: uni-e9999a
+  kind: listing
+  fetch: auto
+  country: France
+  program: EURECOM PhD Portal
+  url: https://www.eurecom.fr/en/teaching/doctoral-program
+  max_detail: 30
+  enabled: true
+- id: uni-0b8ffb
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: Karlsruhe Institute of Technology (KIT) PhD Portal
+  url: https://www.kit.edu/karriere/wissenschaft.php
+  max_detail: 30
+  enabled: true
+- id: uni-8b7a7a
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: TU Berlin PhD Portal
+  url: https://www.tu.berlin/karriere-und-jobs
+  max_detail: 30
+  enabled: true
+- id: uni-83d848
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: TU Dresden PhD Portal
+  url: https://webrelaunch.tu-dresden.de/karriere/stellenangebote
+  max_detail: 30
+  enabled: true
+- id: uni-59541f
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: Saarland University PhD Portal
+  url: https://www.uni-saarland.de/studium/nach/karriere.html
+  max_detail: 30
+  enabled: true
+- id: uni-5adc39
+  kind: listing
+  fetch: auto
+  country: Germany
+  program: Max Planck Society PhD Portal
+  url: https://www.mpg.de/karriere/doktoranden
+  max_detail: 30
+  enabled: true
+- id: uni-8f563a
+  kind: listing
+  fetch: auto
+  country: Switzerland
+  program: University of Neuchâtel PhD Portal
+  url: https://www.unine.ch/formations/doctorat/
+  max_detail: 30
+  enabled: true
+- id: uni-905112
+  kind: listing
+  fetch: auto
+  country: Spain
+  program: UPC BarcelonaTech PhD Portal
+  url: https://doctorat.upc.edu/ca/programes
+  max_detail: 30
   enabled: true

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import hashlib, json, re, threading, traceback
 from pathlib import Path
 from urllib.parse import urlparse

@@ -1,4 +1,5 @@
-"""External data directory (%LOCALAPPDATA%/PhD-Radar), .env loader, SQLite DB, YAML configs, and CV extraction."""
+from __future__ import annotations
+"""External data directory (%LOCALAPPDATA%/PhD-Radar), direct .env loader, SQLite DB, YAML configs, and CV extraction."""
 import datetime, hashlib, json, os, re, shutil, sqlite3, threading, unicodedata
 from pathlib import Path
 import yaml
@@ -11,7 +12,7 @@ UNIS_YAML = CFG_DIR / "universities.yaml"
 ENV_FILE = ROOT / ".env"
 
 
-def _load_dotenv(path: Path) -> None:
+def _load_dotenv(path: Path, override: bool = False) -> None:
     if not path.exists():
         return
     for raw_line in path.read_text("utf-8").splitlines():
@@ -21,19 +22,18 @@ def _load_dotenv(path: Path) -> None:
         k, v = line.split("=", 1)
         k = k.strip()
         v = v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
+        if k and (override or k not in os.environ):
             os.environ[k] = v
 
 
 _load_dotenv(ENV_FILE)
 
-# Store all runtime data outside the git repo so git stays clean automatically
 _default_data = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "PhD-Radar"
 _env_data = os.environ.get("PHDRADAR_DATA", "").strip()
 DATA = Path(_env_data) if _env_data else _default_data
 (DATA / "cvs").mkdir(parents=True, exist_ok=True)
 
-VERSION = "0.6.1"
+VERSION = "0.7.0"
 LOCK = threading.Lock()
 PRIVACY_LOG = []
 
@@ -85,20 +85,19 @@ def load_universities() -> list[tuple[str, str, str]]:
 
 
 def settings() -> dict:
-    saved = jload("settings.json", {})
-    base = {
-        "provider": os.environ.get("AI_PROVIDER", "ollama"),
-        "ollama": os.environ.get("OLLAMA_URL", "http://localhost:11434"),
-        "model": os.environ.get("OLLAMA_MODEL", "gemma4:26b"),
-        "gemini_key": os.environ.get("GEMINI_API_KEY", ""),
-        "gemini_model": os.environ.get("GEMINI_MODEL", "gemini-4-hydrogen"),
-        "openai_key": os.environ.get("OPENAI_API_KEY", ""),
-        "openai_model": os.environ.get("OPENAI_MODEL", "gpt-6.1-sol"),
-        "threshold": 50,
+    """Re-reads .env live while honoring explicit process/test environment overrides."""
+    _load_dotenv(ENV_FILE, override=False)
+    return {
+        "provider": os.environ.get("AI_PROVIDER", "ollama").strip().lower() or "ollama",
+        "ollama": os.environ.get("OLLAMA_URL", "http://localhost:11434").strip(),
+        "model": os.environ.get("OLLAMA_MODEL", "gemma4:26b").strip(),
+        "gemini_key": os.environ.get("GEMINI_API_KEY", "").strip(),
+        "gemini_model": os.environ.get("GEMINI_MODEL", "gemini-4-hydrogen").strip(),
+        "openai_key": os.environ.get("OPENAI_API_KEY", "").strip(),
+        "openai_model": os.environ.get("OPENAI_MODEL", "gpt-6.1-sol").strip(),
+        "threshold": int(os.environ.get("ACCEPTANCE_THRESHOLD", "50") or "50"),
         "privacy": True,
     }
-    merged = {**base, **{k: v for k, v in saved.items() if v not in ("", None)}}
-    return merged
 
 
 def log_outbound(url: str, method: str = "GET") -> None:

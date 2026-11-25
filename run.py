@@ -1,3 +1,4 @@
+from __future__ import annotations
 """PhD-Radar entrypoint. Start: python run.py"""
 import threading, webbrowser, uvicorn
 from backend.api import app

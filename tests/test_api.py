@@ -57,9 +57,11 @@ def test_offers_score_and_on_demand_explain(monkeypatch):
     assert "ETH Zurich" in e_res.json()["explanation"]
 
 
-def test_settings_masks_api_keys_on_get():
-    client.put("/api/settings", json={"provider": "gemini", "gemini_key": "SECRET_KEY_XYZ", "gemini_model": "gemini-4-hydrogen"})
+def test_settings_reads_env_and_masks_api_keys(monkeypatch):
+    monkeypatch.setenv("AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "SECRET_KEY_XYZ")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-4-hydrogen")
     res = client.get("/api/settings").json()
     assert res["provider"] == "gemini"
     assert res["gemini_key_set"] is True
-    assert res["gemini_key"] == ""  # Secret must never be sent back in plaintext
+    assert res["gemini_key"] == ""

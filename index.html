@@ -6,7 +6,6 @@
 <title>PhD-Radar</title>
 <style>
 :root{--bg:#f3f5f2;--sf:#fff;--ink:#14232b;--mut:#5d6d73;--ln:#d9e0dc;--side:#12303a;--sideink:#cfe3dd;--ac:#0f8b6d;--ac2:#c9831b;--bad:#b3392f;--ok:#0f8b6d;--warn:#c9831b}
-:root[data-theme=dark]{--bg:#0e1a1f;--sf:#15262d;--ink:#e3eeea;--mut:#8ea3a8;--ln:#26404a;--side:#0a1317;--sideink:#a9c4bd;--ac:#35c79f;--ac2:#e0a444;--bad:#e8786d;--ok:#35c79f;--warn:#e0a444}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.5 "Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);display:flex;min-height:100vh}
 h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:600;margin:0 0 .5em}
@@ -37,7 +36,7 @@ tr.row:hover{background:color-mix(in srgb,var(--ac) 7%,transparent);cursor:point
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .stat{font:600 1.8rem Georgia,serif}
 .chip{display:inline-block;background:var(--bg);border:1px solid var(--ln);border-radius:4px;padding:0 6px;margin:2px;font-size:12px}
-.chip.g{border-color:var(--ok);color:var(--ok)}.chip.r{border-color:var(--bad);color:var(--bad)}
+.chip.g{border-color:var(--ok);color:var(--ok)}.chip.r{border-color:var(--bad);color:var(--bad)}.chip.w{border-color:var(--warn);color:var(--warn)}
 pre{background:var(--bg);padding:10px;border-radius:6px;max-height:240px;overflow:auto;white-space:pre-wrap;font-size:12px}
 #toast{position:fixed;bottom:16px;right:16px;background:var(--side);color:#fff;padding:9px 14px;border-radius:6px;display:none;z-index:99}
 label{display:block;margin:8px 0 3px;color:var(--mut)}
@@ -51,7 +50,8 @@ label{display:block;margin:8px 0 3px;color:var(--mut)}
 "use strict";
 const $=(s,r=document)=>r.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const TABS=[["dash","Offers"],["detail","Report"],["profile","Profile & CVs"],["src","Sources"],["contacts","Contacts"],["set","Settings"]];
+// Settings tab removed — configuration is read directly from .env
+const TABS=[["dash","Offers"],["detail","Report"],["profile","Profile & CVs"],["src","Sources"],["contacts","Contacts"]];
 const today=new Date().toISOString().slice(0,10);
 
 const DEFAULT_STATE={
@@ -59,13 +59,14 @@ const DEFAULT_STATE={
  profile:{name:"Yassir Tagemouati",headline:"Big Data engineering student, EIDIA, UEMF, Fès (2022–2027)",skills:["AWS S3","Azure Synapse","ADF","ADLS Gen2","Key Vault","Snowflake","Spark","Hadoop/HDFS","MapReduce","Airflow","PostgreSQL","SQL","Power BI","Python","Docker","Git","Medallion architecture"],links:{github:"",linkedin:"",portfolio:""},languages:"French (advanced), English (advanced), Arabic (native)",prefs:"Funded or industrial PhD in data engineering, big data, cloud data architecture. Non-EU candidate based in Morocco.",cvs:[]},
  sources:[],
  contacts:[],
- settings:{provider:"ollama",ollama:"http://localhost:11434",model:"gemma4:26b",gemini_key:"",gemini_key_set:false,gemini_model:"gemini-4-hydrogen",openai_key:"",openai_key_set:false,openai_model:"gpt-6.1-sol",threshold:50,lang:"EN",theme:"light",privacy:true}
+ env:{provider:"ollama",model:"gemma4:26b",gemini_model:"gemini-4-hydrogen",openai_model:"gpt-6.1-sol",threshold:50}
 };
 
 let S=JSON.parse(localStorage.getItem("phdradar")||"null")||structuredClone(DEFAULT_STATE);
-// NEVER restore stale finished crawl bars or old error banners on page open
 delete S.run;
 delete S.apps;
+delete S.settings;
+S.env=S.env||structuredClone(DEFAULT_STATE.env);
 S.logs=[];
 S.reports=S.reports||{};
 S.f=S.f||{q:"",country:"",type:"",cat:"",min:0,hideExp:true,sort:"chance",dir:-1};
@@ -74,7 +75,6 @@ S.tab=document.cookie.replace(/(?:(?:^|.*;\s*)phdradar_tab\s*\=\s*([^;]*).*$)|^.
 if(!TABS.some(t=>t[0]===S.tab))S.tab="dash";
 S.stopping=false;
 
-// Persist only offers, reports, filters, and settings — NEVER S.run
 const save=()=>{
   const{cur,stopping,run,logs,...rest}=S;
   localStorage.setItem("phdradar",JSON.stringify(rest));
@@ -105,7 +105,6 @@ const pctVal=v=>{const n=parseInt(v,10);return Number.isFinite(n)?Math.max(0,Mat
 const meter=v=>{const p=pctVal(v);return`<span class="meter"><b style="width:${p}%"></b></span> <b>${p}%</b>`};
 function dlFile(name,text,type){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:type||"text/plain"}));a.download=name;a.click()}
 
-function setTheme(){document.documentElement.dataset.theme=S.settings.theme}
 function nav(){
   $("#nav").innerHTML='<div class="logo">PhD<i>·</i>Radar</div>'
     +TABS.map((t,i)=>`<button data-t="${t[0]}" class="${S.tab==t[0]?"on":""}" title="Key ${i+1}">${t[1]}</button>`).join("")
@@ -115,7 +114,7 @@ $("#nav").onclick=e=>{const t=e.target.dataset.t;if(t)go(t)};
 function go(t){S.tab=t;nav();render()}
 document.addEventListener("keydown",e=>{if(/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)){if(e.key=="Escape")e.target.blur();return}
  const n=+e.key;if(n>=1&&n<=TABS.length)go(TABS[n-1][0]);if(e.key=="/"){e.preventDefault();const q=$("#q");if(q)q.focus()}});
-function render(){setTheme();({dash,detail,profile,src,contacts,set}[S.tab]||dash)();save()}
+function render(){({dash,detail,profile,src,contacts}[S.tab]||dash)();save()}
 
 function filtered(){
   const f=S.f,q=f.q.toLowerCase();
@@ -132,12 +131,13 @@ function dash(){
   const L=filtered();
   const opt=k=>[...new Set(S.offers.map(o=>o[k]).filter(Boolean))].map(v=>`<option ${S.f[k=="program_type"?"type":k]==v?"selected":""}>${esc(v)}</option>`).join("");
   const soon=S.offers.filter(o=>{const n=days(o.deadline);return n!==null&&n>=0&&n<=14}).length;
-  const hi=S.offers.filter(o=>pctVal(o.chance)>=S.settings.threshold).length;
+  const thr=S.env.threshold||50;
+  const hi=S.offers.filter(o=>pctVal(o.chance)>=thr).length;
   const th=(k,l)=>`<th data-s="${k}">${l}${S.f.sort==k?(S.f.dir<0?" ▾":" ▴"):""}</th>`;
-  const activeModel=S.settings.provider=="gemini"?S.settings.gemini_model:S.settings.provider=="openai"?S.settings.openai_model:S.settings.model;
-  $("#app").innerHTML=`<div class="bar" style="justify-content:space-between"><h1>Offers <small class="mut" style="font:13px sans-serif">AI: ${esc(S.settings.provider)} (${esc(activeModel)})</small></h1><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
+  const activeModel=S.env.provider=="gemini"?S.env.gemini_model:S.env.provider=="openai"?S.env.openai_model:S.env.model;
+  $("#app").innerHTML=`<div class="bar" style="justify-content:space-between"><h1>Offers <small class="mut" style="font:13px sans-serif">.env AI: <b>${esc(S.env.provider)}</b> (${esc(activeModel)})</small></h1><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
   ${runCard()}
-  <div class="grid" style="margin-bottom:14px"><div class="card"><div class="stat">${S.offers.length}</div>offers stored</div><div class="card"><div class="stat">${hi}</div>above ${S.settings.threshold}% acceptance</div><div class="card"><div class="stat ${soon?"warn":""}">${soon}</div>deadlines within 14 days</div></div>
+  <div class="grid" style="margin-bottom:14px"><div class="card"><div class="stat">${S.offers.length}</div>offers stored</div><div class="card"><div class="stat">${hi}</div>above ${thr}% acceptance</div><div class="card"><div class="stat ${soon?"warn":""}">${soon}</div>deadlines within 14 days</div></div>
   <div class="bar">
     <input id="q" placeholder="Search: spark and azure, -java (press /)" value="${esc(S.f.q)}" style="min-width:220px">
     <select id="fcat"><option value="">All categories (${S.offers.length})</option>${[...new Set(S.offers.map(o=>o.category||"Other STEM"))].map(v=>`<option value="${esc(v)}" ${S.f.cat==v?"selected":""}>${esc(v)}</option>`).join("")}</select>
@@ -180,16 +180,18 @@ function runCard(){
 }
 function runBody(r){
   const pc=r.total?Math.round(r.done/r.total*100):0,nm=id=>(S.sources.find(s=>s.id==id)||{program:id}).program;
-  const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut",skipped:"mut"};
+  const cl={ok:"ok",error:"bad",running:"warn",waiting:"mut",skipped:"mut",needs_login:"warn"};
+  const loginBanner=(r.login_prompted&&r.login_prompted.length)?`<div style="margin:8px 0;padding:8px 10px;border:1px solid var(--warn);border-radius:6px"><b class="warn">Login Required:</b> Opened browser window for ${r.login_prompted.map(u=>`<code>${esc(u)}</code>`).join(", ")}. Log in inside that browser window, then click <b>Start research</b> again (or click <b>Capture this page</b> in Sources).</div>`:"";
   return (r.msg?`<p class="bad" style="margin:10px 0 0">${esc(r.msg)}</p>`:"")
+    +loginBanner
     +(r.total?`<p style="margin:10px 0 4px">${meter(pc)} ${r.done}/${r.total} sources, <b>${r.new||0}</b> new offers${r.running?"":" (finished)"}</p>`:"")
-    +(r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":""}" title="${esc(s.error||s.note||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found+" new":""}${s.note?" · "+esc(s.note):""}</span></span>`).join("")
+    +(r.sources||[]).map(s=>`<span class="chip ${s.status=="ok"?"g":s.status=="error"?"r":s.status=="needs_login"?"w":""}" title="${esc(s.error||s.note||"")}">${esc(nm(s.id))}: <span class="${cl[s.status]||"mut"}">${esc(s.status)}${s.found!=null&&s.status=="ok"?" · "+s.found+" new":""}${s.note?" · "+esc(s.note):""}</span></span>`).join("")
     +(r.sources||[]).filter(s=>s.status=="error").map(s=>`<div class="bad" style="font-size:12px;margin-top:4px">${esc(nm(s.id))}: ${esc(s.error)}</div>`).join("");
 }
 function refreshRun(){const e=$("#run");if(e)e.outerHTML=runCard()}
 async function crawl(){
   S.stopping=false;const total=S.sources.filter(s=>s.enabled).length;
-  S.run={running:true,done:0,total,new:0,sources:[],msg:""};log("Research started on "+total+" sources");refreshRun();
+  S.run={running:true,done:0,total,new:0,sources:[],msg:"",login_prompted:[]};log("Research started on "+total+" sources");refreshRun();
   const r=await api("/crawl/start",{method:"POST"});
   if(!r){S.run={running:false,done:0,total:0,new:0,sources:[],msg:"Backend not reachable. Start with: .\\.venv\\Scripts\\python.exe run.py"};refreshRun();return}
   poll();
@@ -207,12 +209,13 @@ async function poll(){
 async function stopRun(){S.stopping=true;refreshRun();await api("/crawl/stop",{method:"POST"})}
 
 async function scoreAll(){
-  toast(`Fast % scoring via ${S.settings.provider.toUpperCase()}...`);
-  const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})},600000);
+  const cfgS=await api("/settings");if(cfgS)S.env=cfgS;
+  toast(`Fast % scoring via ${S.env.provider.toUpperCase()} (.env)...`);
+  const r=await api("/score",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:S.profile})},600000);
   if(r){
     const o=await api("/offers");if(o)S.offers=o;
     toast(`Scored ${r.scored} offers`);render();
-  }else toast("Scoring failed. Check AI provider in .env or Settings.");
+  }else toast("Scoring failed. Check AI_PROVIDER & API key in .env.");
 }
 
 function ics(){
@@ -238,14 +241,14 @@ function detail(){
   $("#back").onclick=()=>go("dash");
   $("#whyBtn").onclick=async()=>{
     toast("Generating score explanation...");
-    const res=await fetch("/api/offers/"+o.id+"/explain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})});
+    const res=await fetch("/api/offers/"+o.id+"/explain",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:S.profile})});
     const r=await res.json();
     if(res.ok){o.score_explanation=r.explanation;save();render()}
     else toast("Error: "+(r.error||res.statusText));
   };
   $("#deep").onclick=async()=>{
     toast("Running deep analysis...");
-    const res=await fetch("/api/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({provider:S.settings.provider,profile:S.profile})});
+    const res=await fetch("/api/offers/"+o.id+"/report",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({profile:S.profile})});
     const r=await res.json();
     S.reports[o.id]=res.ok?r.markdown:`# Error (${res.status})\n\n${r.error||res.statusText}`;
     render();
@@ -275,7 +278,7 @@ async function src(){
   const v=await api("/version"),diag=await api("/diagnostics"),r=await api("/sources");if(Array.isArray(r))S.sources=r;
   $("#app").innerHTML=`<div class="bar" style="justify-content:space-between"><h1>Sources & Discovery <small class="mut" style="font:13px sans-serif">${v?"v"+esc(v.version)+" · .env: "+(v.env_loaded?"loaded":"missing")+" · data: "+esc(v.data_dir):""}</small></h1><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
   ${runCard()}
-  ${diag?`<div class="card"><h3>System Status</h3><div class="bar" style="margin:0">
+  ${diag?`<div class="card"><h3>System Status (Configured via <code>.env</code>)</h3><div class="bar" style="margin:0">
     <span class="pill ${diag.env_loaded?"ok":"warn"}">.env: ${diag.env_loaded?"Loaded":"Not found"}</span>
     <span class="pill ${diag.ai.ok?"ok":"bad"}">AI (${esc(diag.ai.provider)}): ${diag.ai.ok?esc(diag.ai.model):esc(diag.ai.error)}</span>
     <span class="pill ${diag.playwright_installed?"ok":"warn"}">Playwright: ${diag.playwright_installed?"Ready":"Missing"}</span>
@@ -283,11 +286,11 @@ async function src(){
     <span class="pill ${diag.cvs.length?"ok":"warn"}">CVs: ${diag.cvs.length} indexed</span>
   </div></div>`:""}
   <div class="bar"><button class="b p" id="hc">Run health check</button><button class="b" id="rs">Reset sources to defaults</button></div>
-  <div class="card"><h3>Assisted Browser (ADUM & Login Portals)</h3><input id="bu" value="https://adum.fr/as/ed/proposition_Setab.pl" style="width:55%"> <button class="b p" onclick="brOpen()">Open browser</button> <button class="b" onclick="brCap()">Capture this page</button> <button class="b" onclick="brClose()">Close</button></div>
+  <div class="card"><h3>Assisted Login Browser (ANRT CIFRE, ADUM & Login Portals)</h3><p class="mut" style="margin:0 0 8px;font-size:12px">Cookies saved here are shared automatically with the background crawler.</p><input id="bu" value="https://offres-et-candidatures-cifre.anrt.asso.fr/" style="width:55%"> <button class="b p" onclick="brOpen()">Open browser</button> <button class="b" onclick="brCap()">Capture this page</button> <button class="b" onclick="brClose()">Close</button></div>
   <div class="card"><h3>University Portal Discovery Agent (<code>config/universities.yaml</code>)</h3>
     <div class="bar" style="margin:0">
       <select id="dcountry"><option value="">All countries (${v?v.universities:0} unis)</option><option>France</option><option>Germany</option><option>Switzerland</option><option>United Kingdom</option><option>Netherlands</option><option>Belgium</option><option>Denmark</option><option>Norway</option><option>Sweden</option><option>Spain</option></select>
-      <input id="dlim" type="number" value="10" min="1" max="150" style="width:65px">
+      <input id="dlim" type="number" value="150" min="1" max="500" style="width:75px">
       <button class="b p" id="drun">Discover University Portals</button>
     </div><div id="dstat" class="mut" style="font-size:12px;margin-top:6px"></div>
   </div>
@@ -300,9 +303,25 @@ async function src(){
   $("#rs").onclick=async()=>{if(!confirm("Reset sources.yaml to defaults?"))return;const h=await api("/sources/reset",{method:"POST"});if(h)S.sources=h;render()};
   $("#au").onclick=async()=>{const u=$("#nu").value.trim();if(!u)return;await api("/sources",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({url:u})});const h=await api("/sources");if(h)S.sources=h;render()};
   $("#drun").onclick=async()=>{
-    const r=await api("/discover/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({country:$("#dcountry").value,limit:+$("#dlim").value||10})});
-    if(!r){toast("Discovery already running");return}
-    const pollD=async()=>{const st=await api("/discover/status");if(!st)return;$("#dstat").innerHTML=`<b>${st.running?"Discovering":"Finished"}:</b> ${st.done}/${st.total} · <b>${st.found}</b> portals added · ${esc(st.current)}<pre style="max-height:110px">${esc((st.log||[]).slice(0,15).join("\n"))}</pre>`;if(st.running)setTimeout(pollD,2000);else{const h=await api("/sources");if(h)S.sources=h;render()}};pollD();
+    const btn=$("#drun");
+    btn.disabled=true;
+    $("#dstat").innerHTML="<b>Starting university portal discovery...</b>";
+    const r=await api("/discover/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({country:$("#dcountry").value,limit:+$("#dlim").value||150})});
+    if(!r){btn.disabled=false;$("#dstat").innerHTML='<span class="bad">Could not start discovery (backend unreachable or already running).</span>';return}
+    const pollD=async()=>{
+      const st=await api("/discover/status");
+      if(!st){btn.disabled=false;return}
+      const html=`<b>${st.running?"Discovering":"Finished"}:</b> ${st.done}/${st.total} · <b>${st.found}</b> portals added · ${esc(st.current)}<pre style="max-height:140px">${esc((st.log||[]).slice(0,30).join("\n"))}</pre>`;
+      $("#dstat").innerHTML=html;
+      if(st.running){setTimeout(pollD,1200)}
+      else{
+        btn.disabled=false;
+        const h=await api("/sources");if(h)S.sources=h;
+        render();
+        if($("#dstat"))$("#dstat").innerHTML=html;
+      }
+    };
+    pollD();
   };
 }
 
@@ -312,35 +331,6 @@ function contacts(){
   $("#csv").onclick=()=>{const k=["name","email","role","org","offer_id","date_found"];dlFile("contacts.csv",[k.join(","),...S.contacts.map(c=>k.map(x=>'"'+String(c[x]||"").replace(/"/g,'""')+'"').join(","))].join("\n"),"text/csv")};
 }
 
-function set(){
-  const s=S.settings;
-  $("#app").innerHTML=`<h1>Settings</h1><div class="card">
-    <p class="mut" style="margin-top:0">Defaults and API keys are automatically loaded from <code>.env</code> in your project root. Overrides saved here persist in your external data folder.</p>
-    <label>Active AI Provider</label>
-    <select id="provider" style="width:100%">
-      <option value="ollama" ${s.provider=="ollama"?"selected":""}>Local Ollama (Free & Private)</option>
-      <option value="gemini" ${s.provider=="gemini"?"selected":""}>Google Gemini API</option>
-      <option value="openai" ${s.provider=="openai"?"selected":""}>OpenAI API</option>
-    </select>
-    <label>Ollama URL & Model</label>
-    <div class="bar"><input id="ollama" value="${esc(s.ollama)}" style="flex:1"><input id="model" value="${esc(s.model)}" style="flex:1" placeholder="gemma4:26b"></div>
-    <label>Google Gemini API Key & Model ${s.gemini_key_set?'<span class="pill ok">Key loaded from .env / saved</span>':''}</label>
-    <div class="bar"><input id="gemini_key" type="password" value="${esc(s.gemini_key||"")}" placeholder="${s.gemini_key_set?"(Leave blank to keep loaded key)":"AIza..."}" style="flex:1"><input id="gemini_model" value="${esc(s.gemini_model||"gemini-4-hydrogen")}" placeholder="gemini-4-hydrogen" style="flex:1"></div>
-    <label>OpenAI API Key & Model ${s.openai_key_set?'<span class="pill ok">Key loaded from .env / saved</span>':''}</label>
-    <div class="bar"><input id="openai_key" type="password" value="${esc(s.openai_key||"")}" placeholder="${s.openai_key_set?"(Leave blank to keep loaded key)":"sk-..."}" style="flex:1"><input id="openai_model" value="${esc(s.openai_model||"gpt-6.1-sol")}" placeholder="gpt-6.1-sol" style="flex:1"></div>
-    <label>Acceptance Threshold (%)</label><input id="threshold" type="number" value="${esc(s.threshold)}" style="width:100%">
-    <label>Theme</label><select id="theme" style="width:100%"><option value="light" ${s.theme=="light"?"selected":""}>Light</option><option value="dark" ${s.theme=="dark"?"selected":""}>Dark</option></select>
-    <div class="bar" style="margin-top:12px"><button class="b p" id="ss">Save settings</button><button class="b warn" onclick="clearPageState()">Clear Page State</button></div>
-  </div>`;
-  $("#ss").onclick=async()=>{
-    ["provider","ollama","model","gemini_key","gemini_model","openai_key","openai_model","theme"].forEach(k=>s[k]=$("#"+k).value);
-    s.threshold=+$("#threshold").value||50;
-    save();await api("/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(s)});
-    const fresh=await api("/settings");if(fresh)Object.assign(S.settings,fresh);
-    setTheme();toast("Settings saved");render();
-  };
-}
-
 (async()=>{
   const st=await api("/crawl/status");
   if(st&&st.running){S.run=st;poll();}
@@ -348,7 +338,7 @@ function set(){
   const o=await api("/offers");if(Array.isArray(o))S.offers=o;
   const ct=await api("/contacts");if(Array.isArray(ct))S.contacts=ct;
   const p=await api("/profile");if(p&&p.skills)S.profile=p;
-  const cfgS=await api("/settings");if(cfgS&&cfgS.provider)Object.assign(S.settings,cfgS);
+  const cfgS=await api("/settings");if(cfgS&&cfgS.provider)S.env=cfgS;
   nav();render();
 })();
 </script>
